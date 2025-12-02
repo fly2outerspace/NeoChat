@@ -214,11 +214,7 @@ class TelegramAgent(ChatAgent):
         current_time = get_current_time(session_id=self.session_id) if self.session_id else get_current_time()
         messages, _ = Memory.get_messages_around_time(self.session_id, time_point=current_time, max_messages=100, character_id=self.character_id)
         messages = self._format_messages(messages)
-        aid_content = f"""current time: {current_time}\n{HELPER_PROMPT}"""
+        aid_content = f"""**current time**: {current_time}\n**Your Current Inner Thought:** [{self.inner_thought or "None"}] Perform as your thought but never print it out.\n{HELPER_PROMPT}"""
         aid_message = Message.system_message(aid_content, speaker=self.name, created_at=current_time, visible_for_characters=self.visible_for_characters)
         messages.append(aid_message)
-        if self.inner_thought:
-            inner_thought = f"**Your Current Inner Thought:** {self.inner_thought}"
-            inner_thought_msg = Message.system_message(inner_thought, speaker=self.name, created_at=current_time, category=MessageCategory.THOUGHT, visible_for_characters=self.visible_for_characters)
-            messages.append(inner_thought_msg)
         return messages

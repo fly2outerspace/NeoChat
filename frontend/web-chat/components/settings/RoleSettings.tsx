@@ -275,6 +275,8 @@ export default function RoleSettings() {
       if (newCharacterFileInputRef.current) {
         newCharacterFileInputRef.current.value = '';
       }
+      // 触发角色列表重新加载事件，通知ChatArea重新加载角色列表
+      window.dispatchEvent(new CustomEvent('charactersReloaded'));
     } catch (err: any) {
       setError(err.message || '创建角色失败');
       console.error('Failed to create character:', err);
@@ -330,7 +332,13 @@ export default function RoleSettings() {
       await loadCharacters();
       if (selectedCharacter?.character_id === character.character_id) {
         setSelectedCharacter(null);
+        // 触发角色更新事件，通知其他组件（如ChatArea）更新
+        window.dispatchEvent(new CustomEvent('characterUpdated', { 
+          detail: null 
+        }));
       }
+      // 触发角色列表重新加载事件，通知ChatArea重新加载角色列表
+      window.dispatchEvent(new CustomEvent('charactersReloaded'));
     } catch (err: any) {
       setError(err.message || '删除角色失败');
       console.error('Failed to delete character:', err);

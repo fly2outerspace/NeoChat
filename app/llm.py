@@ -208,6 +208,10 @@ class LLM:
             OpenAIError: If API call fails after retries
         """
         try:
+
+            # from pprint import pprint
+            # for msg in messages:
+            #     pprint(msg.to_dict(), width=210)
             messages = self.format_messages(messages)
             if not stream:
                 response = await self.client.chat.completions.create(

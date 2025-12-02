@@ -249,11 +249,33 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
       setSelectedModel(null);
     };
 
+    // 监听角色列表更新事件（当角色被删除或创建时）
+    const handleCharactersReload = () => {
+      loadCharacters();
+    };
+
     window.addEventListener('localStorageCleared', handleLocalStorageCleared);
+    window.addEventListener('charactersReloaded', handleCharactersReload);
     return () => {
       window.removeEventListener('localStorageCleared', handleLocalStorageCleared);
+      window.removeEventListener('charactersReloaded', handleCharactersReload);
     };
   }, []);
+
+  // 当角色列表更新时，过滤掉参与者列表中已删除的角色ID
+  useEffect(() => {
+    const validCharacterIds = new Set(allCharacters.map(c => c.character_id));
+    setParticipantIds(prev => {
+      // 保留'user'和仍然存在的角色ID
+      const filtered = prev.filter(id => id === 'user' || validCharacterIds.has(id));
+      // 如果列表发生变化，更新localStorage
+      if (filtered.length !== prev.length || filtered.some((id, idx) => id !== prev[idx])) {
+        localStorage.setItem('selected_participants', JSON.stringify(filtered));
+        return filtered;
+      }
+      return prev;
+    });
+  }, [allCharacters]);
 
   // 加载头像和角色信息
   useEffect(() => {

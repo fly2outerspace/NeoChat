@@ -69,7 +69,100 @@ class Character(ToolCallAgent):
             system_msgs.append(Message.system_message(self.roleplay_prompt, speaker=self.name, created_at=current_time, visible_for_characters=self.visible_for_characters))
         if self.system_prompt:
             system_msgs.append(Message.system_message(self.system_prompt, speaker=self.name, created_at=current_time, visible_for_characters=self.visible_for_characters))
+        memory_messages = self.prepare_memory_messages()
+        system_msgs.extend(memory_messages)
         return system_msgs
+
+
+    def prepare_memory_messages(self) -> list[Message]:
+        """Prepare auxiliary messages for strategy agent.
+        
+        1) One message: Display all schedules and scenarios (including future plans) for the current session, sorted by start_at.
+           Format: One line per item: [start_at ~ end_at] schedule content or scenario title.
+        2) One message: Display all relationship entries for the current session.
+        """
+        current_time = get_current_time(session_id=self.session_id)
+        memory_messages: list[Message] = []
+
+        # 1) Overview of all schedules + scenarios, sorted by start time
+        schedule_entries = Memory.get_schedule_entries(self.session_id, character_id=self.character_id)
+        
+        scenario_store = ScenarioStore()
+        if self.session_id:
+            scenario_store.set_session(self.session_id)
+        scenarios = scenario_store.list_scenarios(self.session_id, character_id=self.character_id)
+        
+        combined_items = []
+        # Collect schedules
+        for entry in schedule_entries:
+            combined_items.append(
+                {
+                    "start_at": entry.start_at,
+                    "end_at": entry.end_at,
+                    "text": entry.content + f"(ID:{entry.entry_id})" or "",
+                }
+            )
+
+        # Collect scenarios (prefer title, fallback to content if missing)
+        for sc in scenarios:
+            combined_items.append(
+                {
+                    "start_at": sc.start_at,
+                    "end_at": sc.end_at,
+                    "text": (getattr(sc, "title", "") or sc.content or "") + f"(ID:{sc.scenario_id})",
+                }
+            )
+
+        combined_items.sort(key=lambda x: x["start_at"])
+
+        if combined_items:
+            lines = [
+                f"[{item['start_at']} ~ {item['end_at']}] {item['text']}"
+                for item in combined_items
+            ]
+            overview_text = "\n".join(lines)
+            schedule_scenario_content = (
+                "Schedule and scenario overview sorted by start time:\n" + overview_text
+            )
+        else:
+            schedule_scenario_content = "No schedule or scenario records found."
+
+        memory_messages.append(
+            Message.system_message(
+                schedule_scenario_content,
+                speaker=self.name,
+                created_at=current_time,
+                visible_for_characters=self.visible_for_characters,
+            )
+        )
+
+        # 2) Overview of all relationships
+        relations = Memory.get_relations(self.session_id, character_id=self.character_id)
+        if relations:
+            relation_lines = []
+            for rel in relations:
+                relation_lines.append(
+                    "------\n"
+                    f"relation_id: {rel.relation_id}\n"
+                    f"name: {rel.name}\n"
+                    f"knowledge: {rel.knowledge}\n"
+                    f"progress: {rel.progress}"
+                )
+            relations_text = "\n".join(relation_lines)
+            relations_content = "Currently recorded relationships:\n" + relations_text
+        else:
+            relations_content = "No relationship records found."
+
+        memory_messages.append(
+            Message.system_message(
+                relations_content,
+                speaker=self.name,
+                created_at=current_time,
+                visible_for_characters=self.visible_for_characters,
+            )
+        )
+
+        return memory_messages
 
     def prepare_messages(self) -> list[Message]:
         # Use underlying memory messages instead of the Memory object itself
