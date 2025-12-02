@@ -525,6 +525,10 @@ class LLM:
             if tool_choice not in ["none", "auto", "required"]:
                 raise ValueError(f"Invalid tool_choice: {tool_choice}")
 
+            from pprint import pprint
+            for msg in messages:
+                pprint(msg.to_dict(), width=210)
+                
             # Format messages
             if system_msgs:
                 system_msgs = self.format_messages(system_msgs)
