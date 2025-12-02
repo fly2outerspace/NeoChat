@@ -1,11 +1,22 @@
 """Settings database initialization and connection management"""
 import sqlite3
+import sys
 from pathlib import Path
 from app.logger import logger
 
 
-# Settings database file path (in project root)
-SETTINGS_DB_PATH = Path(__file__).parent.parent.parent / "data" / "settings.db"
+def _get_settings_db_path() -> Path:
+    """Get settings database path (supports packaged mode)"""
+    if getattr(sys, 'frozen', False):
+        # Running in PyInstaller bundle - use exe directory
+        return Path(sys.executable).parent / "data" / "settings.db"
+    else:
+        # Development mode - use project root
+        return Path(__file__).parent.parent.parent / "data" / "settings.db"
+
+
+# Settings database file path
+SETTINGS_DB_PATH = _get_settings_db_path()
 
 
 def get_settings_connection(timeout: float = 5.0):

@@ -1,6 +1,7 @@
 """Database manager for archive management"""
 import shutil
 import sqlite3
+import sys
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -8,6 +9,21 @@ from typing import Optional, List, Dict, Any
 
 from app.logger import logger
 from app.storage.meilisearch_service import MeilisearchService
+
+
+def _get_data_root() -> Path:
+    """
+    Get the root directory for data storage.
+    
+    In packaged mode: returns directory containing NeoChat.exe
+    In development mode: returns project root
+    """
+    if getattr(sys, 'frozen', False):
+        # Running in PyInstaller bundle - use exe directory
+        return Path(sys.executable).parent
+    else:
+        # Development mode - use project root
+        return Path(__file__).parent.parent.parent
 
 
 class DatabaseManager:
@@ -30,12 +46,12 @@ class DatabaseManager:
         if self._initialized:
             return
         
-        # Project root directory
-        self._project_root = Path(__file__).parent.parent.parent
+        # Get data root (exe directory in packaged mode, project root in dev mode)
+        self._data_root = _get_data_root()
         
-        # Directory paths
-        self._data_dir = self._project_root / "data"
-        self._archives_dir = self._data_dir / "archives"
+        # Directory paths - use "data" for working files, "save" for archives
+        self._data_dir = self._data_root / "data"
+        self._archives_dir = self._data_root / "save"  # Changed from "data/archives" to "save"
         
         # Create directories if they don't exist
         self._data_dir.mkdir(parents=True, exist_ok=True)
