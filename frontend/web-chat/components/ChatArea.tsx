@@ -249,11 +249,33 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
       setSelectedModel(null);
     };
 
+    // 监听角色列表更新事件（当角色被删除或创建时）
+    const handleCharactersReload = () => {
+      loadCharacters();
+    };
+
     window.addEventListener('localStorageCleared', handleLocalStorageCleared);
+    window.addEventListener('charactersReloaded', handleCharactersReload);
     return () => {
       window.removeEventListener('localStorageCleared', handleLocalStorageCleared);
+      window.removeEventListener('charactersReloaded', handleCharactersReload);
     };
   }, []);
+
+  // 当角色列表更新时，过滤掉参与者列表中已删除的角色ID
+  useEffect(() => {
+    const validCharacterIds = new Set(allCharacters.map(c => c.character_id));
+    setParticipantIds(prev => {
+      // 只保留仍然存在的角色ID（包括user角色卡）
+      const filtered = prev.filter(id => validCharacterIds.has(id));
+      // 如果列表发生变化，更新localStorage
+      if (filtered.length !== prev.length || filtered.some((id, idx) => id !== prev[idx])) {
+        localStorage.setItem('selected_participants', JSON.stringify(filtered));
+        return filtered;
+      }
+      return prev;
+    });
+  }, [allCharacters]);
 
   // 加载头像和角色信息
   useEffect(() => {
@@ -727,11 +749,8 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
             },
           }),
           // Add participants field (use selected participants, or empty array if none)
-          // Convert 'user' to 'user_{session_id}' format
           ...(participantIds.length > 0 && {
-            participants: participantIds.map(id => 
-              id === 'user' ? `user_${currentSessionId}` : id
-            ),
+            participants: participantIds,
           }),
           ...(selectedModel && {
             model_info: {
@@ -1049,17 +1068,6 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
     });
   };
 
-  // Handle user participant toggle (special case)
-  const handleUserParticipantToggle = () => {
-    const userKey = 'user';
-    setParticipantIds(prev => {
-      const newIds = prev.includes(userKey)
-        ? prev.filter(id => id !== userKey)
-        : [...prev, userKey];
-      localStorage.setItem('selected_participants', JSON.stringify(newIds));
-      return newIds;
-    });
-  };
 
   // 确保目标角色始终在参与者列表中
   useEffect(() => {
@@ -1543,17 +1551,7 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
                             key={id}
                             className="w-5 h-5 rounded-full bg-slate-700 border border-slate-600 flex items-center justify-center flex-shrink-0 overflow-hidden"
                           >
-                            {id === 'user' ? (
-                              userAvatar ? (
-                                <img 
-                                  src={userAvatar} 
-                                  alt="用户头像" 
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <div className="text-xs">👤</div>
-                              )
-                            ) : characterAvatarMap.get(id) ? (
+                            {characterAvatarMap.get(id) ? (
                               <img 
                                 src={characterAvatarMap.get(id)!} 
                                 alt="角色头像" 
@@ -1580,41 +1578,6 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
                 {participantsDropdownOpen && (
                   <div className="absolute bottom-full left-0 mb-1 w-64 max-h-60 overflow-y-auto bg-slate-800 border border-slate-700 rounded-md shadow-lg z-50">
                     <div className="p-1">
-                      {/* User option */}
-                      {(() => {
-                        const isUserSelected = participantIds.includes('user');
-                        return (
-                          <button
-                            key="user"
-                            type="button"
-                            onClick={handleUserParticipantToggle}
-                            className={`w-full flex items-center gap-2 px-3 py-2 rounded text-sm text-left transition-colors ${
-                              isUserSelected
-                                ? 'bg-sky-600/20 text-sky-300 hover:bg-sky-600/30'
-                                : 'text-slate-300 hover:bg-slate-700'
-                            }`}
-                          >
-                            <div className="w-5 h-5 rounded border border-slate-600 flex items-center justify-center flex-shrink-0">
-                              {isUserSelected && (
-                                <span className="text-xs text-sky-400">✓</span>
-                              )}
-                            </div>
-                            <div className="w-6 h-6 rounded-full bg-slate-700 border border-slate-600 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                              {userAvatar ? (
-                                <img 
-                                  src={userAvatar} 
-                                  alt="用户" 
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <div className="text-xs">👤</div>
-                              )}
-                            </div>
-                            <span className="truncate">用户</span>
-                          </button>
-                        );
-                      })()}
-                      
                       {/* Character options */}
                       {allCharacters.map((character) => {
                         const isSelected = participantIds.includes(character.character_id);

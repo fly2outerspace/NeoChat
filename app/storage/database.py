@@ -1,12 +1,23 @@
 """Database initialization and connection management"""
 import sqlite3
 import os
+import sys
 from pathlib import Path
 from app.logger import logger
 
 
-# Database file path (in project root) - kept for backward compatibility
-DB_PATH = Path(__file__).parent.parent.parent / "data" / "chat.db"
+def _get_default_db_path() -> Path:
+    """Get default database path (supports packaged mode)"""
+    if getattr(sys, 'frozen', False):
+        # Running in PyInstaller bundle - use exe directory
+        return Path(sys.executable).parent / "data" / "chat.db"
+    else:
+        # Development mode - use project root
+        return Path(__file__).parent.parent.parent / "data" / "chat.db"
+
+
+# Database file path - kept for backward compatibility
+DB_PATH = _get_default_db_path()
 
 
 def get_connection(timeout: float = 5.0):

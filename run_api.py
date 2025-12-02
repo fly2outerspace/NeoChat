@@ -204,11 +204,22 @@ def signal_handler(signum, frame):
 
 def print_welcome():
     """打印欢迎界面"""
+    is_packaged = getattr(sys, 'frozen', False)
+    
     print("\n" + "=" * 50)
     print(" " * 18 + "NeoChat")
     print("=" * 50)
-    print("\n  Backend API:  http://localhost:8000")
-    print("  Frontend:     http://localhost:3000")
+    
+    if is_packaged:
+        # Packaged mode: frontend served via FastAPI on port 8000
+        print("\n  访问地址:  http://localhost:8000")
+        print("\n  (打包模式 - 前后端统一端口)")
+    else:
+        # Development mode: separate frontend dev server
+        print("\n  Backend API:  http://localhost:8000")
+        print("  Frontend:     http://localhost:3000")
+        print("\n  (开发模式 - 前后端分离)")
+    
     print("\n" + "=" * 50 + "\n")
 
 
@@ -237,11 +248,19 @@ if __name__ == "__main__":
     backend_thread = threading.Thread(target=run_backend, daemon=True)
     backend_thread.start()
     
-    # 等待后端就绪后启动前端
-    start_frontend()
+    # 检查是否为打包模式
+    is_packaged = getattr(sys, 'frozen', False)
+    
+    # 仅在开发模式下启动前端开发服务器
+    # 打包模式下，前端由 FastAPI 静态文件服务提供
+    if not is_packaged:
+        start_frontend()
+    else:
+        # 打包模式：等待后端就绪
+        wait_for_backend()
     
     # 打印欢迎界面
-    time.sleep(1)  # 给前端一点时间启动
+    time.sleep(1)  # 给服务一点时间完成启动
     print_welcome()
     
     # 保持主线程运行

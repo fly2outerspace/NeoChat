@@ -148,7 +148,7 @@ export function saveStreamingEnabled(enabled: boolean): void {
 export type ChatMode = 'agent' | 'flow';
 
 const CHAT_MODE_KEY = 'neochat_chat_mode';
-const DEFAULT_CHAT_MODE: ChatMode = 'flow';
+const DEFAULT_CHAT_MODE: ChatMode = 'agent';
 
 export function getChatMode(): ChatMode {
   if (typeof window === 'undefined') {

@@ -1,21 +1,71 @@
 # NeoChat
 
-NeoChat 是一个全栈项目，用于汇集验证个人关于REALTIME LLM CHAT的想法。
+| NeoChat 是一个全栈项目，用于汇集验证个人关于REALTIME LLM CHAT的想法。
 
-当前这个项目汇聚了角色卡、存档、长期记忆、多人聊天功能。
+本项目竭尽所能来实现一件事：
 
-当前的聊天基于react框架实现，预设了个人角色扮演场景（并未在冒险游戏、多人同词验证）
+**让任何想象的角色扮演场景实现，在任何切入点继续想象与创造。**
 
 ![对话](assets/sample.png)
 
-> **注意**: 当前版本仅支持 Windows 系统。后续版本将提供可执行文件打包。
 
-## Get Started
+## Features
+
+NeoChat基于一个可以自定义的虚拟时间线实现，鼓励NPC在一个动态的时间线上规划和记录自己的生活。
+
+玩家可以通过管理发言对象、参与者来控制多人对话，营造家庭聚餐，暗地里的密谋或是工作会议。
+
+![配置模型](assets/multi-npc.png)
+
+---
+NPC自觉管理的日程和人际关系
+
+![配置模型](assets/memory_relations.png)
+
+管理存档
+
+![配置模型](assets/manage_saving.png)
+
+编辑众多角色并保存
+
+![配置模型](assets/manage_npcs.png)
+
+设置你的代理人，让它代替你自动说话
+
+![配置模型](assets/set_your_agent.png)
 
 配置你的模型
 
 ![配置模型](assets/modelsetting.png)
 
+## 开始游玩
+
+### 下载发布版本
+
+1. 前往 [Releases 页面](https://github.com/fly2outerspace/NeoChat/releases) 下载最新版本
+2. 下载 `NeoChat-v0.0.2-windows.zip` 压缩包
+3. 解压到任意目录
+
+### 启动程序
+
+双击 `NeoChat.exe` 即可启动！
+
+程序启动后，打开浏览器访问 **http://localhost:8000** 进入聊天界面。
+
+### 目录说明
+
+```
+NeoChat/
+├── NeoChat.exe          # 双击运行
+├── meilisearch/         # 搜索引擎（已内置）
+├── data/                # 工作数据
+├── save/                # 存档目录
+└── _internal/           # 程序文件
+    └── config/
+        └── config.toml  # 配置文件（LLM API 等）
+```
+
+---
 
 ## 开发环境设置 (For Developers)
 
