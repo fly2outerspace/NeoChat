@@ -248,11 +248,19 @@ if __name__ == "__main__":
     backend_thread = threading.Thread(target=run_backend, daemon=True)
     backend_thread.start()
     
-    # 等待后端就绪后启动前端
-    start_frontend()
+    # 检查是否为打包模式
+    is_packaged = getattr(sys, 'frozen', False)
+    
+    # 仅在开发模式下启动前端开发服务器
+    # 打包模式下，前端由 FastAPI 静态文件服务提供
+    if not is_packaged:
+        start_frontend()
+    else:
+        # 打包模式：等待后端就绪
+        wait_for_backend()
     
     # 打印欢迎界面
-    time.sleep(1)  # 给前端一点时间启动
+    time.sleep(1)  # 给服务一点时间完成启动
     print_welcome()
     
     # 保持主线程运行
