@@ -30,7 +30,12 @@ MANIFEST
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
-*.spec
+# Keep neochat.spec for packaging (don't ignore it)
+# *.spec
+
+# Frontend build output (included in exe package)
+frontend/web-chat/out/
+frontend/web-chat/.next/
 
 # Installer logs
 pip-log.txt
@@ -164,3 +169,4 @@ data/
 scripts/
 tests/
 docs/
+save/

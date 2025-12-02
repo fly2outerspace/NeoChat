@@ -1,6 +1,7 @@
 """Integrated Meilisearch service combining manager and client"""
 import os
 import subprocess
+import sys
 import time
 import signal
 from pathlib import Path
@@ -10,6 +11,37 @@ from meilisearch import Client
 from meilisearch.errors import MeilisearchError
 
 from app.logger import logger
+
+
+def _resolve_path(path_str: str) -> Path:
+    """
+    Resolve a path string to an absolute Path.
+    
+    If the path is relative, resolve it relative to the executable directory
+    (for packaged apps) or the current working directory.
+    
+    Args:
+        path_str: Path string (absolute or relative)
+        
+    Returns:
+        Absolute Path object
+    """
+    path = Path(path_str)
+    
+    if path.is_absolute():
+        return path
+    
+    # For packaged apps, resolve relative to exe directory
+    if getattr(sys, 'frozen', False):
+        exe_dir = Path(sys.executable).parent
+        resolved = exe_dir / path
+        logger.info(f"Resolved relative path '{path_str}' to '{resolved}' (packaged mode)")
+        return resolved
+    
+    # For development, resolve relative to current working directory
+    resolved = Path.cwd() / path
+    logger.info(f"Resolved relative path '{path_str}' to '{resolved}' (dev mode)")
+    return resolved
 
 
 class MeilisearchService:
@@ -211,15 +243,18 @@ class MeilisearchService:
         try:
             # Set process management attributes
             if executable_path:
-                self.executable_path = Path(executable_path)
+                # Resolve path (supports both absolute and relative paths)
+                self.executable_path = _resolve_path(executable_path)
                 if not self.executable_path.exists():
                     logger.warning(f"Meilisearch executable not found: {self.executable_path}")
                     self.executable_path = None
                 else:
+                    logger.info(f"Meilisearch executable found: {self.executable_path}")
                     # Create db directory if specified
                     if db_path:
-                        self.db_path = Path(db_path)
+                        self.db_path = _resolve_path(db_path)
                         self.db_path.mkdir(parents=True, exist_ok=True)
+                        logger.info(f"Meilisearch db path: {self.db_path}")
             
             self.http_addr = http_addr
             self.base_url = f"http://{http_addr}"

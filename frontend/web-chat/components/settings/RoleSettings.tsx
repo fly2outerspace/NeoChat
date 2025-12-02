@@ -12,6 +12,8 @@ import {
 } from '@/lib/api/character';
 import { useLocalStorageInput } from '@/lib/useLocalStorageInput';
 
+const USER_CHARACTER_ID = 'user';
+
 export default function RoleSettings() {
   const [characters, setCharacters] = useState<Character[]>([]);
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
@@ -190,7 +192,11 @@ export default function RoleSettings() {
       setLoading(true);
       setError(null);
       const data = await listCharacters();
-      setCharacters(data);
+      
+      // Filter out user character (character_id === 'user') from role settings
+      // User character should only be edited in UserSettings
+      const filteredData = data.filter(c => c.character_id !== USER_CHARACTER_ID);
+      setCharacters(filteredData);
       
       // 从 localStorage 加载选中的角色
       const stored = localStorage.getItem('selected_character');
@@ -199,9 +205,12 @@ export default function RoleSettings() {
       if (stored) {
         try {
           const characterInfo = JSON.parse(stored);
-          const found = data.find(c => c.character_id === characterInfo.character_id);
-          if (found) {
-            characterToSelect = found;
+          // Skip if the stored character is user (should not appear in role settings)
+          if (characterInfo.character_id !== USER_CHARACTER_ID) {
+            const found = filteredData.find(c => c.character_id === characterInfo.character_id);
+            if (found) {
+              characterToSelect = found;
+            }
           }
         } catch (e) {
           console.error('Failed to parse stored character:', e);
@@ -210,19 +219,24 @@ export default function RoleSettings() {
       
       // 如果有选中的角色，更新它
       if (selectedCharacter) {
-        const updated = data.find(c => c.character_id === selectedCharacter.character_id);
-        if (updated) {
-          setSelectedCharacter(updated);
-        } else {
-          // 如果选中的角色被删除了，清空选择
+        // If currently selected character is user, clear selection
+        if (selectedCharacter.character_id === USER_CHARACTER_ID) {
           setSelectedCharacter(null);
+        } else {
+          const updated = filteredData.find(c => c.character_id === selectedCharacter.character_id);
+          if (updated) {
+            setSelectedCharacter(updated);
+          } else {
+            // 如果选中的角色被删除了，清空选择
+            setSelectedCharacter(null);
+          }
         }
       } else if (characterToSelect) {
         // 从 localStorage 恢复选中的角色
         setSelectedCharacter(characterToSelect);
-      } else if (data.length > 0) {
+      } else if (filteredData.length > 0) {
         // 如果没有选中的角色，自动选择第一个
-        setSelectedCharacter(data[0]);
+        setSelectedCharacter(filteredData[0]);
       }
     } catch (err: any) {
       setError(err.message || '加载角色列表失败');
@@ -275,6 +289,8 @@ export default function RoleSettings() {
       if (newCharacterFileInputRef.current) {
         newCharacterFileInputRef.current.value = '';
       }
+      // 触发角色列表重新加载事件，通知ChatArea重新加载角色列表
+      window.dispatchEvent(new CustomEvent('charactersReloaded'));
     } catch (err: any) {
       setError(err.message || '创建角色失败');
       console.error('Failed to create character:', err);
@@ -330,7 +346,13 @@ export default function RoleSettings() {
       await loadCharacters();
       if (selectedCharacter?.character_id === character.character_id) {
         setSelectedCharacter(null);
+        // 触发角色更新事件，通知其他组件（如ChatArea）更新
+        window.dispatchEvent(new CustomEvent('characterUpdated', { 
+          detail: null 
+        }));
       }
+      // 触发角色列表重新加载事件，通知ChatArea重新加载角色列表
+      window.dispatchEvent(new CustomEvent('charactersReloaded'));
     } catch (err: any) {
       setError(err.message || '删除角色失败');
       console.error('Failed to delete character:', err);

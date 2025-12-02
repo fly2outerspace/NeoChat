@@ -10,6 +10,7 @@ Supports TOML configuration files with inheritance:
     model = "gpt-4"
     temperature = 0.7
 """
+import sys
 import threading
 import tomllib
 from pathlib import Path
@@ -23,7 +24,24 @@ def get_project_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def get_executable_dir() -> Path:
+    """
+    Get the directory containing the executable (for packaged apps).
+    This is where relative paths should be resolved from.
+    
+    In packaged mode: returns directory containing NeoChat.exe
+    In development mode: returns project root
+    """
+    if getattr(sys, 'frozen', False):
+        # Running in PyInstaller bundle - use exe directory
+        return Path(sys.executable).parent
+    else:
+        # Development mode - use project root
+        return get_project_root()
+
+
 PROJECT_ROOT = get_project_root()
+EXECUTABLE_DIR = get_executable_dir()
 WORKSPACE_ROOT = PROJECT_ROOT / "workspace"
 
 

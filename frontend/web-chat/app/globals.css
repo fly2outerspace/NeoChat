@@ -25,7 +25,83 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Ensure arbitrary values are supported */
+/* 
+ * Custom theme colors for chat bubbles
+ * These classes are dynamically applied based on themes.ts
+ * Tailwind CSS v4 requires explicit definitions for arbitrary values used dynamically
+ */
 @layer utilities {
-  /* This ensures Tailwind v4 processes arbitrary values correctly */
+  /* Background colors */
+  .bg-theme-purple { background-color: #240A27; }
+  .bg-theme-blue { background-color: rgba(16, 24, 42, 0.85); }
+  .bg-theme-ocean { background-color: #223B57; }
+  .bg-theme-warm { background-color: #241E1A; }
+  .bg-theme-magenta { background-color: #2F0B32; }
+  .bg-theme-command { background-color: #1A0F1A; }
+  .bg-theme-brown { background-color: #302822; }
+  .bg-theme-teal { background-color: #194E40; }
+  .bg-theme-navy { background-color: #10182A; }
+  
+  /* Text colors */
+  .text-theme-purple { color: #EFB5FF; }
+  .text-theme-blue { color: #D8E4FF; }
+  .text-theme-white { color: #F2FAFF; }
+  .text-theme-cream { color: #F4E7CE; }
+  .text-theme-pink { color: #F6C9FF; }
+  .text-theme-gold { color: #FFD700; }
+  .text-theme-beige { color: #F8ECD6; }
+  .text-theme-mint { color: #E8FFF6; }
+  
+  /* Border colors */
+  .border-theme-purple { border-color: #3A0F3F; }
+  .border-theme-blue { border-color: rgba(31, 45, 69, 0.7); }
+  .border-theme-ocean { border-color: #335577; }
+  .border-theme-warm { border-color: #3A3029; }
+  .border-theme-magenta { border-color: #47104A; }
+  .border-theme-command { border-color: #3A1F3A; }
+  .border-theme-brown { border-color: #43372F; }
+  .border-theme-teal { border-color: #296F5C; }
+  .border-theme-navy { border-color: #1F2D45; }
+}
+
+/* Arbitrary value classes used in themes.ts - force include in build */
+@layer components {
+  /* These ensure Tailwind includes the arbitrary classes */
+  .safelist-bg-1 { @apply bg-[#240A27]; }
+  .safelist-bg-2 { @apply bg-[#10182A]/85; }
+  .safelist-bg-3 { @apply bg-[#223B57]; }
+  .safelist-bg-4 { @apply bg-[#241E1A]; }
+  .safelist-bg-5 { @apply bg-[#2F0B32]; }
+  .safelist-bg-6 { @apply bg-[#1A0F1A]; }
+  .safelist-bg-7 { @apply bg-[#302822]; }
+  .safelist-bg-8 { @apply bg-[#194E40]; }
+  .safelist-bg-9 { @apply bg-[#10182A]; }
+  
+  .safelist-text-1 { @apply text-[#EFB5FF]; }
+  .safelist-text-2 { @apply text-[#D8E4FF]; }
+  .safelist-text-3 { @apply text-[#F2FAFF]; }
+  .safelist-text-4 { @apply text-[#F4E7CE]; }
+  .safelist-text-5 { @apply text-[#F6C9FF]; }
+  .safelist-text-6 { @apply text-[#FFD700]; }
+  .safelist-text-7 { @apply text-[#F8ECD6]; }
+  .safelist-text-8 { @apply text-[#E8FFF6]; }
+  
+  .safelist-border-1 { @apply border-[#3A0F3F]; }
+  .safelist-border-2 { @apply border-[#1F2D45]/70; }
+  .safelist-border-3 { @apply border-[#335577]; }
+  .safelist-border-4 { @apply border-[#3A3029]; }
+  .safelist-border-5 { @apply border-[#47104A]; }
+  .safelist-border-6 { @apply border-[#3A1F3A]; }
+  .safelist-border-7 { @apply border-[#43372F]; }
+  .safelist-border-8 { @apply border-[#296F5C]; }
+  .safelist-border-9 { @apply border-[#1F2D45]; }
+  
+  .safelist-shadow-1 { @apply shadow-[0_0_10px_rgba(239,181,255,0.15)]; }
+  .safelist-shadow-2 { @apply shadow-[0_0_8px_rgba(242,250,255,0.12)]; }
+  .safelist-shadow-3 { @apply shadow-[0_0_8px_rgba(244,231,206,0.1)]; }
+  .safelist-shadow-4 { @apply shadow-[0_0_10px_rgba(246,201,255,0.16)]; }
+  .safelist-shadow-5 { @apply shadow-[0_0_12px_rgba(255,215,0,0.25)]; }
+  .safelist-shadow-6 { @apply shadow-[0_0_10px_rgba(248,236,214,0.15)]; }
+  .safelist-shadow-7 { @apply shadow-[0_0_9px_rgba(232,255,246,0.14)]; }
+  .safelist-shadow-8 { @apply shadow-[0_0_8px_rgba(216,228,255,0.12)]; }
 }

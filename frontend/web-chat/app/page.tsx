@@ -56,51 +56,6 @@ export default function HomePage() {
     setCurrentSessionId(sessionId);
   };
 
-  const renderContent = () => {
-    switch (currentView) {
-      case 'chat':
-        return <ChatArea sessionId={currentSessionId} onSessionCreated={handleSessionCreated} />;
-      case 'archive-save':
-        return <ArchiveManager />;
-      case 'archive-load':
-        return <ArchiveLoader />;
-      case 'system':
-        return (
-          <div className="h-full overflow-y-auto p-8">
-            <div className="max-w-3xl mx-auto">
-              <SystemSettings />
-            </div>
-          </div>
-        );
-      case 'user':
-        return (
-          <div className="h-full overflow-y-auto p-8">
-            <div className="max-w-3xl mx-auto">
-              <UserSettings />
-            </div>
-          </div>
-        );
-      case 'role':
-        return (
-          <div className="h-full overflow-y-auto p-8">
-            <div className="max-w-3xl mx-auto">
-              <RoleSettings />
-            </div>
-          </div>
-        );
-      case 'model':
-        return (
-          <div className="h-full overflow-y-auto p-8">
-            <div className="max-w-3xl mx-auto">
-              <ModelSettings />
-            </div>
-          </div>
-        );
-      default:
-        return <ChatArea sessionId={currentSessionId} />;
-    }
-  };
-
   return (
     <div className="h-screen flex bg-slate-900 text-slate-50 overflow-hidden">
       {/* 左侧栏：统一菜单栏 */}
@@ -108,17 +63,56 @@ export default function HomePage() {
         <Sidebar currentView={currentView} onViewChange={handleViewChange} />
       </div>
 
-      {/* 中间栏：内容区域 */}
-      <div className="flex-1 min-w-0">
-        {renderContent()}
+      {/* 中间栏：内容区域 - 所有组件始终挂载，通过显示/隐藏控制 */}
+      <div className="flex-1 min-w-0 relative">
+        {/* ChatArea - 始终挂载，切换页面时不会被卸载 */}
+        <div className={currentView === 'chat' ? 'h-full' : 'hidden'}>
+          <ChatArea sessionId={currentSessionId} onSessionCreated={handleSessionCreated} />
+        </div>
+
+        {/* Archive Manager - 始终挂载 */}
+        <div className={currentView === 'archive-save' ? 'h-full' : 'hidden'}>
+          <ArchiveManager />
+        </div>
+
+        {/* Archive Loader - 始终挂载 */}
+        <div className={currentView === 'archive-load' ? 'h-full' : 'hidden'}>
+          <ArchiveLoader />
+        </div>
+
+        {/* System Settings - 始终挂载 */}
+        <div className={currentView === 'system' ? 'h-full overflow-y-auto p-8' : 'hidden'}>
+          <div className="max-w-3xl mx-auto">
+            <SystemSettings />
+          </div>
+        </div>
+
+        {/* User Settings - 始终挂载 */}
+        <div className={currentView === 'user' ? 'h-full overflow-y-auto p-8' : 'hidden'}>
+          <div className="max-w-3xl mx-auto">
+            <UserSettings />
+          </div>
+        </div>
+
+        {/* Role Settings - 始终挂载 */}
+        <div className={currentView === 'role' ? 'h-full overflow-y-auto p-8' : 'hidden'}>
+          <div className="max-w-3xl mx-auto">
+            <RoleSettings />
+          </div>
+        </div>
+
+        {/* Model Settings - 始终挂载 */}
+        <div className={currentView === 'model' ? 'h-full overflow-y-auto p-8' : 'hidden'}>
+          <div className="max-w-3xl mx-auto">
+            <ModelSettings />
+          </div>
+        </div>
       </div>
 
-      {/* 右侧栏：会话状态（仅在对话界面显示） */}
-      {currentView === 'chat' && (
-        <div className="w-80 flex-shrink-0">
-          <SessionStatus sessionId={currentSessionId} />
-        </div>
-      )}
+      {/* 右侧栏：会话状态 - 始终挂载，仅在对话界面显示 */}
+      <div className={`w-80 flex-shrink-0 ${currentView === 'chat' ? '' : 'hidden'}`}>
+        <SessionStatus sessionId={currentSessionId} />
+      </div>
     </div>
   );
 }

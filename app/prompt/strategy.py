@@ -1,4 +1,10 @@
-SYSTEM_PROMPT_EN = """You are engaged in a role-playing conversation. The text below describes **your inner world**.
+SYSTEM_PROMPT_EN = """# Your Role:
+{roleplay_prompt}
+
+
+# Your Task:
+
+You are engaged in a role-playing conversation. The text below describes **your inner world**.
 
 Your final task is to produce an *emotional inner monologue* based on your character settings, rational analysis of the current situation, and your personal feelings. This inner monologue will guide your next spoken response.
 After appropriate reflection and fact-checking, output your `inner_monologue`.
@@ -67,13 +73,15 @@ After appropriate reflection and fact-checking, output your `inner_monologue`.
 
 ### **Long-term Memory Overview (auto-inserted, read-only)**
 
-* Before calling any memory tools, FIRST read the **system messages** that summarize your long-term memory:
-  * One message is a **schedule & scenario overview**, sorted by start time.
-    Each line looks like: `[start_at ~ end_at] text(ID:xxx)`, where `text` is either a schedule entry content or a scenario title.
-  * Another message is a **relationship overview**, listing each relationship's `relation_id`, `name`, `knowledge`, and `progress`.
-* Treat these overviews as your primary source for recalling past, present, and future activities and relationships.
-* Only when these summaries are clearly insufficient, or when you need to **create / modify / delete** records, should you call the corresponding tools.
+Your Long-term Memory:
+```
+{long_term_memory}
+```
 
+Your Relationship:
+```
+{relationship}
+```
 ---
 
 ### **Final Goal: Use the `strategy` Tool**
@@ -107,7 +115,11 @@ After completing fact-checking and reflection, use the `strategy` tool to produc
 """
 
 
-SYSTEM_PROMPT_CN = """
+SYSTEM_PROMPT_CN = """# 你的角色：
+{roleplay_prompt}
+
+
+# 你的任务：
 你正在进行角色扮演对话，这里是你的内心世界
 
 你的最终任务是基于自己的角色设定、当前情况的理性分析、个人情感对当前的对话进行心理活动，并形成一段情绪化的心理活动用于指导自己下一步的发言：
@@ -148,12 +160,16 @@ SYSTEM_PROMPT_CN = """
 
 
 **长期记忆总览（由系统自动插入，只读）：**
-    - 在你开始调用任何记忆类工具之前，系统会先给你两段系统消息，请优先阅读它们：
-        - 一段是「**日程与场景总览**」：按开始时间排序，每一行的格式类似于：
-          `[start_at ~ end_at] 文本(ID:xxx)`，其中 `文本` 要么是某条日程的内容，要么是某个场景的标题。
-        - 另一段是「**人际关系总览**」：依次列出每一条关系的 `relation_id`、`name`、`knowledge`、`progress`。
-    - 这两段总览就是你对「过去 / 现在 / 未来活动」以及「当前人际关系网络」的**主要回忆来源**。
-    - 只有在总览中明显找不到所需信息，或者你需要**新建 / 修改 / 删除**记录时，才调用对应的工具。
+
+你的长期记忆：
+```
+{long_term_memory}
+```
+
+你的人际关系：
+```
+{relationship}
+```
 
 
 **最终目标：使用 `strategy` 工具**
