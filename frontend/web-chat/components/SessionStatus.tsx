@@ -370,6 +370,14 @@ export default function SessionStatus({ sessionId }: SessionStatusProps) {
           未选择会话
         </div>
       )}
+      
+      {/* Tips 提示 */}
+      <div className="mt-auto pt-4 border-t border-slate-800">
+        <div className="text-xs text-slate-500 leading-relaxed">
+          <span className="text-slate-400 font-medium">tips：</span>
+          可以使用<code className="px-1 py-0.5 bg-slate-800 rounded text-slate-300">跳过</code>和<code className="px-1 py-0.5 bg-slate-800 rounded text-slate-300">目标选择</code>来进行灵活地多人/替身对话
+        </div>
+      </div>
     </div>
   );
 }

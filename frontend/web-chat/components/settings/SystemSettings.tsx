@@ -185,7 +185,7 @@ export default function SystemSettings() {
                     ?
                   </div>
                   <div className="absolute left-0 top-6 w-64 p-3 bg-slate-800 border border-slate-600 rounded-md text-xs text-slate-200 shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
-                    使用flow来体验更新的是实验性内容，agent不支持多人场景
+                    Flow 模式为实验性内容，正在开发中
                   </div>
                 </div>
               </div>

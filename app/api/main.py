@@ -1,20 +1,69 @@
 """FastAPI application main file"""
 import json
 import os
+import sys
 import asyncio
 from contextlib import asynccontextmanager
+from pathlib import Path
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import Response, FileResponse
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import chat, search, character, model, time, archive
 from app.logger import logger
 from app.config import config
 from app.storage.meilisearch_service import MeilisearchService
 from app.storage.model_init import init_default_models
+
+
+def get_frontend_static_path() -> Path | None:
+    """
+    Get the path to frontend static files.
+    Returns None if not found (development mode).
+    
+    In packaged mode (PyInstaller), files are in:
+    - exe_dir/_internal/frontend (if bundled with COLLECT)
+    - or sys._MEIPASS/frontend (if using onefile mode)
+    
+    In development mode:
+    - frontend/web-chat/out (after npm build)
+    """
+    # Check if running in PyInstaller bundle
+    if getattr(sys, 'frozen', False):
+        # Running in PyInstaller bundle
+        exe_dir = Path(sys.executable).parent
+        
+        # Check _internal directory first (COLLECT mode)
+        static_path = exe_dir / "_internal" / "frontend"
+        if static_path.exists() and (static_path / "index.html").exists():
+            logger.info(f"Found frontend in _internal: {static_path}")
+            return static_path
+        
+        # Check MEIPASS (onefile mode)
+        if hasattr(sys, '_MEIPASS'):
+            base_path = Path(sys._MEIPASS)
+            static_path = base_path / "frontend"
+            if static_path.exists() and (static_path / "index.html").exists():
+                logger.info(f"Found frontend in MEIPASS: {static_path}")
+                return static_path
+        
+        # Check relative to executable
+        static_path = exe_dir / "frontend"
+        if static_path.exists() and (static_path / "index.html").exists():
+            logger.info(f"Found frontend next to exe: {static_path}")
+            return static_path
+    
+    # Development mode: check for built frontend
+    dev_static_path = Path(__file__).parent.parent.parent / "frontend" / "web-chat" / "out"
+    if dev_static_path.exists() and (dev_static_path / "index.html").exists():
+        logger.info(f"Found frontend in dev mode: {dev_static_path}")
+        return dev_static_path
+    
+    return None
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
@@ -84,10 +133,8 @@ async def lifespan(app: FastAPI):
     # Startup: Initialize database
     logger.info("Initializing database...")
     # Initialize default database file directly to avoid recursion
-    from app.storage.database import init_database_for_path
-    from pathlib import Path
-    default_db_path = Path(__file__).parent.parent.parent / "data" / "chat.db"
-    init_database_for_path(default_db_path)
+    from app.storage.database import init_database_for_path, DB_PATH
+    init_database_for_path(DB_PATH)
     logger.info("Database initialized successfully")
     
     # Startup: Initialize database manager and default archive
@@ -205,16 +252,51 @@ app.include_router(frontend_messages.router)
 app.include_router(sessions.router)
 
 
-@app.get("/")
-async def root():
-    """Root endpoint"""
-    return {"message": "NeoChat API Server", "status": "running"}
-
-
 @app.get("/health")
 async def health():
     """Health check endpoint"""
     return {"status": "healthy"}
+
+
+# Mount frontend static files if available (for packaged deployment)
+_frontend_path = get_frontend_static_path()
+if _frontend_path:
+    logger.info(f"Mounting frontend static files from: {_frontend_path}")
+    
+    # Serve static assets (js, css, images, etc.)
+    app.mount("/_next", StaticFiles(directory=str(_frontend_path / "_next")), name="next_static")
+    
+    # Serve index.html for root path
+    @app.get("/")
+    async def serve_frontend_root():
+        """Serve frontend index.html"""
+        return FileResponse(str(_frontend_path / "index.html"))
+    
+    # Catch-all route for SPA - must be last
+    @app.get("/{full_path:path}")
+    async def serve_frontend_spa(full_path: str):
+        """Serve frontend for SPA routes"""
+        # Try to serve the exact file first
+        file_path = _frontend_path / full_path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(str(file_path))
+        
+        # For directories, try index.html
+        if file_path.exists() and file_path.is_dir():
+            index_path = file_path / "index.html"
+            if index_path.exists():
+                return FileResponse(str(index_path))
+        
+        # Otherwise, serve root index.html for SPA routing
+        return FileResponse(str(_frontend_path / "index.html"))
+else:
+    logger.info("Frontend static files not found - running in API-only mode")
+    logger.info("To enable frontend: cd frontend/web-chat && pnpm build")
+    
+    @app.get("/")
+    async def root():
+        """Root endpoint (API-only mode)"""
+        return {"message": "NeoChat API Server", "status": "running", "mode": "api-only"}
 
 
 if __name__ == "__main__":

@@ -204,11 +204,22 @@ def signal_handler(signum, frame):
 
 def print_welcome():
     """打印欢迎界面"""
+    is_packaged = getattr(sys, 'frozen', False)
+    
     print("\n" + "=" * 50)
     print(" " * 18 + "NeoChat")
     print("=" * 50)
-    print("\n  Backend API:  http://localhost:8000")
-    print("  Frontend:     http://localhost:3000")
+    
+    if is_packaged:
+        # Packaged mode: frontend served via FastAPI on port 8000
+        print("\n  访问地址:  http://localhost:8000")
+        print("\n  (打包模式 - 前后端统一端口)")
+    else:
+        # Development mode: separate frontend dev server
+        print("\n  Backend API:  http://localhost:8000")
+        print("  Frontend:     http://localhost:3000")
+        print("\n  (开发模式 - 前后端分离)")
+    
     print("\n" + "=" * 50 + "\n")
 
 

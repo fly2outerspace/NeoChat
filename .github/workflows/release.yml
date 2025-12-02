@@ -1,0 +1,73 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags like v1.0.0
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    
+    - name: Install pnpm
+      run: npm install -g pnpm
+    
+    - name: Install Python dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install pyinstaller
+    
+    - name: Install frontend dependencies
+      run: |
+        cd frontend/web-chat
+        pnpm install
+    
+    - name: Build frontend
+      run: |
+        cd frontend/web-chat
+        pnpm build
+    
+    - name: Build with PyInstaller
+      run: pyinstaller neochat.spec --clean --noconfirm
+    
+    - name: Prepare release package
+      run: |
+        mkdir dist\NeoChat\meilisearch
+        mkdir dist\NeoChat\meili_data
+        mkdir dist\NeoChat\data
+      shell: pwsh
+    
+    - name: Create release archive
+      run: |
+        Compress-Archive -Path "dist\NeoChat\*" -DestinationPath "NeoChat-${{ github.ref_name }}-windows.zip"
+      shell: pwsh
+    
+    - name: Upload Release Asset
+      uses: softprops/action-gh-release@v1
+      with:
+        files: NeoChat-${{ github.ref_name }}-windows.zip
+        body: |
+          ## NeoChat ${{ github.ref_name }}
+          
+          ### 使用方法
+          1. 下载并解压 `NeoChat-${{ github.ref_name }}-windows.zip`
+          2. 下载 [Meilisearch](https://www.meilisearch.com/download) 放入 `meilisearch/` 文件夹
+          3. 双击 `NeoChat.exe` 启动
+          4. 访问 http://localhost:8000
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
