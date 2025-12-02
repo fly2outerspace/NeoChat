@@ -31,25 +31,22 @@ class SpeakAgent(ChatAgent):
     def prepare_system_messages(self) -> list[Message]:
         """Prepare system messages for the agent"""
         current_time = get_current_time(session_id=self.session_id)
-        system_msgs = []
-        if self.roleplay_prompt:
-            system_msgs.append(Message.system_message(self.roleplay_prompt, speaker=self.name, created_at=current_time, visible_for_characters=self.visible_for_characters))
-        if self.system_prompt:
-            system_msgs.append(Message.system_message(self.system_prompt, speaker=self.name, created_at=current_time, visible_for_characters=self.visible_for_characters))
-        memory_messages = self.prepare_memory_messages()
-        system_msgs.extend(memory_messages)
-        return system_msgs
+        long_term_memory, relationship = self.prepare_memory_content()
+        system_prompt = self.system_prompt.format(
+            roleplay_prompt=self.roleplay_prompt,
+            long_term_memory=long_term_memory, 
+            relationship=relationship
+        )
+        system_msg = Message.system_message(system_prompt, speaker=self.name, created_at=current_time, visible_for_characters=[self.character_id])
+        return [system_msg]
 
-    def prepare_memory_messages(self) -> list[Message]:
-        """Prepare auxiliary messages for strategy agent.
+    def prepare_memory_content(self) -> tuple[str, str]:
+        """Prepare memory content for strategy agent.
         
         1) One message: Display all schedules and scenarios (including future plans) for the current session, sorted by start_at.
            Format: One line per item: [start_at ~ end_at] schedule content or scenario title.
         2) One message: Display all relationship entries for the current session.
         """
-        current_time = get_current_time(session_id=self.session_id)
-        memory_messages: list[Message] = []
-
         # 1) Overview of all schedules + scenarios, sorted by start time
         schedule_entries = Memory.get_schedule_entries(self.session_id, character_id=self.character_id)
         
@@ -65,7 +62,7 @@ class SpeakAgent(ChatAgent):
                 {
                     "start_at": entry.start_at,
                     "end_at": entry.end_at,
-                    "text": entry.content or "",
+                    "text": entry.content + f"(ID:{entry.entry_id})" or "",
                 }
             )
 
@@ -75,7 +72,7 @@ class SpeakAgent(ChatAgent):
                 {
                     "start_at": sc.start_at,
                     "end_at": sc.end_at,
-                    "text": (getattr(sc, "title", "") or sc.content or ""),
+                    "text": (getattr(sc, "title", "") or sc.content or "") + f"(ID:{sc.scenario_id})",
                 }
             )
 
@@ -92,15 +89,6 @@ class SpeakAgent(ChatAgent):
             )
         else:
             schedule_scenario_content = "No schedule or scenario records found."
-
-        memory_messages.append(
-            Message.system_message(
-                schedule_scenario_content,
-                speaker=self.name,
-                created_at=current_time,
-                visible_for_characters=self.visible_for_characters,
-            )
-        )
 
         # 2) Overview of all relationships
         relations = Memory.get_relations(self.session_id, character_id=self.character_id)
@@ -119,14 +107,7 @@ class SpeakAgent(ChatAgent):
         else:
             relations_content = "No relationship records found."
 
-        memory_messages.append(
-            Message.system_message(
-                relations_content,
-                speaker=self.name,
-                created_at=current_time,
-                visible_for_characters=self.visible_for_characters,
-            )
-        )
+        return schedule_scenario_content, relations_content
 
         return memory_messages
     def handle_user_input(self, request: str, **kwargs):
