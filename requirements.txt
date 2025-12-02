@@ -1,0 +1,23 @@
+# Core dependencies
+pydantic>=2.0.0
+openai>=1.0.0
+tenacity>=8.0.0
+
+# API server dependencies
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
+# Client dependencies (optional, for example_api_client.py)
+httpx>=0.25.0
+
+# Web search dependencies
+ddgs==9.9.1
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+
+# Search engine dependencies
+meilisearch>=0.32.0
+
+# Encryption dependencies
+cryptography>=41.0.0
+

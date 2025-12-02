@@ -1,0 +1,68 @@
+"""Collection classes for managing multiple tools."""
+from typing import Any, Dict, List
+
+from app.exceptions import ToolError
+from app.tool.base import BaseTool, ToolFailure, ToolResult
+
+
+class ToolCollection:
+    """A collection of defined tools."""
+
+    def __init__(self, *tools: BaseTool):
+        self.tools = tools
+        self.tool_map = {tool.name: tool for tool in tools}
+
+    def __iter__(self):
+        return iter(self.tools)
+
+    def to_params(self) -> List[Dict[str, Any]]:
+        return [tool.to_param() for tool in self.tools]
+
+    async def execute(
+        self, *, name: str, tool_input: Dict[str, Any] = None, session_id: str = None
+    ) -> ToolResult:
+        tool = self.tool_map.get(name)
+        if not tool:
+            return ToolFailure(error=f"Tool {name} is invalid")
+        try:
+            # Merge session_id into tool_input if provided
+            if tool_input is None:
+                tool_input = {}
+            if session_id is not None:
+                tool_input['session_id'] = session_id
+            result = await tool(**tool_input)
+            
+            # Handle backward compatibility: if tool returns string, wrap it in ToolResult
+            if isinstance(result, str):
+                return ToolResult.from_output(result)
+            elif not isinstance(result, ToolResult):
+                # Convert other types to ToolResult
+                return ToolResult.from_output(result)
+            
+            return result
+        except ToolError as e:
+            return ToolFailure(error=e.message)
+
+    async def execute_all(self) -> List[ToolResult]:
+        """Execute all tools in the collection sequentially."""
+        results = []
+        for tool in self.tools:
+            try:
+                result = await tool()
+                results.append(result)
+            except ToolError as e:
+                results.append(ToolFailure(error=e.message))
+        return results
+
+    def get_tool(self, name: str) -> BaseTool:
+        return self.tool_map.get(name)
+
+    def add_tool(self, tool: BaseTool):
+        self.tools += (tool,)
+        self.tool_map[tool.name] = tool
+        return self
+
+    def add_tools(self, *tools: BaseTool):
+        for tool in tools:
+            self.add_tool(tool)
+        return self

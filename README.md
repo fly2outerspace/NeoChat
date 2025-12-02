@@ -1,0 +1,90 @@
+# NeoChat
+
+NeoChat 是一个全栈项目，用于汇集验证个人关于REALTIME LLM CHAT的想法。
+
+当前这个项目汇聚了角色卡、存档、长期记忆、多人聊天功能。
+
+当前的聊天基于react框架实现，预设了个人角色扮演场景（并未在冒险游戏、多人同词验证）
+
+![对话](assets/sample.png)
+
+> **注意**: 当前版本仅支持 Windows 系统。后续版本将提供可执行文件打包。
+
+## Get Started
+
+配置你的模型
+
+![配置模型](assets/modelsetting.png)
+
+
+## 开发环境设置 (For Developers)
+
+### 前置要求
+
+- Python 3.8+
+- Node.js 18+ (用于前端开发)
+- npm 或 pnpm (推荐使用 pnpm)
+
+### 1. 安装 Python 依赖
+
+在项目根目录下执行：
+
+```bash
+pip install -r requirements.txt
+```
+
+### 2. 安装前端依赖
+
+进入前端目录并安装依赖：
+
+```bash
+cd frontend/web-chat
+npm install
+# 或使用 pnpm
+pnpm install
+```
+
+### 3. 安装 Meilisearch
+
+Meilisearch 是一个开源的搜索引擎，用于消息检索功能。
+
+#### 下载 Meilisearch
+
+访问 Meilisearch 官方下载页面：
+- **下载地址**: https://www.meilisearch.com/download
+
+选择 Windows 版本下载 `meilisearch-windows-amd64.exe`
+
+#### 配置 Meilisearch
+
+1. 将下载的 `meilisearch-windows-amd64.exe` 放置到任意目录（例如：`E:\WorkSpace\Service\meilisearch\`）
+
+2. 编辑 `config/config.toml` 文件，配置 Meilisearch 路径：
+
+```toml
+[meilisearch]
+executable_path = "E:\\WorkSpace\\Service\\meilisearch\\meilisearch-windows-amd64.exe"
+db_path = "E:\\WorkSpace\\Service\\meilisearch\\meili_data"
+http_addr = "127.0.0.1:7700"
+auto_start = true
+```
+
+> **提示**: 
+> - `executable_path`: Meilisearch 可执行文件的完整路径
+> - `db_path`: 数据持久化目录（可选）
+> - `http_addr`: 服务地址，默认 `127.0.0.1:7700`
+> - `auto_start`: 设置为 `true` 时，应用启动时会自动启动 Meilisearch
+
+### 4. 启动开发服务器
+
+在项目根目录下执行：
+
+```bash
+python run_api.py
+```
+
+这将同时启动：
+- 后端 API 服务器（默认端口: 8000）
+- 前端开发服务器（Next.js）
+
+访问 http://localhost:3000 查看前端界面。

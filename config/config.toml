@@ -1,0 +1,40 @@
+# Global LLM configuration
+[llm.openai]
+model = "gpt-4o"
+base_url = "https://api.openai.com/v1"
+api_key = ""
+max_tokens = 4096
+temperature = 1
+
+# DeepSeek configuration
+[llm.deepseek]
+model = "deepseek-chat"
+base_url = "https://api.deepseek.com/v1"
+api_key = ""
+max_tokens = 4096
+temperature = 1
+
+# Grok configuration (xAI)
+[llm.grok]
+model = "grok-4-1-fast-non-reasoning"
+base_url = "https://api.x.ai/v1"
+api_key = ""
+max_tokens = 4096
+temperature = 1
+
+
+[llm.openrouter]
+model = "google/gemini-2.5-flash"
+base_url = "https://openrouter.ai/api/v1"
+api_key = ""  
+max_tokens = 4096
+temperature = 1
+
+
+# Meilisearch configuration (optional)
+[meilisearch]
+executable_path = "E:\\WorkSpace\\Service\\meilisearch\\meilisearch-windows-amd64.exe"
+db_path = "E:\\WorkSpace\\Service\\meilisearch\\meili_data"  # Optional: data persistence directory
+http_addr = "127.0.0.1:7700"  # Optional: default is 127.0.0.1:7700
+auto_start = true  # Set to true to auto-start Meilisearch on FastAPI startup
+# Note: auto_sync has been removed - Meilisearch is automatically refreshed when switching archives
