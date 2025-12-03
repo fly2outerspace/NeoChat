@@ -1,90 +1,71 @@
 """Base Flow - Composite Runnable implementation
 
 BaseFlow is the abstract base class for all flows. It extends Runnable
-to be compatible with the unified execution framework while maintaining
-backward compatibility with the existing flow interface.
+to provide a unified execution framework.
 
 A Flow is a composite Runnable - it contains and orchestrates child Runnables
 (which can be Agents or other Flows).
 """
 
 from abc import abstractmethod
-from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Union
 
 from pydantic import Field
 
-from app.agent.base import BaseAgent
 from app.logger import logger
 from app.runnable.base import Runnable
 from app.runnable.context import ExecutionContext
 from app.runnable.node import RunnableNode
-from app.schema import (
-    ExecutionEvent,
-    ExecutionState,
-    FlowState,
-)
+from app.schema import ExecutionEvent, ExecutionState
 
 
 class FlowNode(RunnableNode):
-    """Flow node definition for composing agents and flows
+    """Flow node definition for composing Runnables (Agents or Flows)
     
-    Each node contains a factory for creating an Agent or Flow,
+    Each node contains a factory for creating a Runnable,
     with optional adapters for input/output transformation.
     
     Attributes:
         id: Unique node identifier
         name: Human-readable node name
-        agent_factory: Factory function that creates an Agent
+        runnable_factory: Factory function that creates a Runnable from ExecutionContext
         input_adapter: Function to transform context before execution
         output_adapter: Function to extract output and update context
         next_node_selector: Function to select next node ID
         is_background: If True, runs in background (for ParallelFlow)
     """
     
-    # Agent factory (creates Agent from context dict)
-    agent_factory: Optional[Callable[[Dict[str, Any]], BaseAgent]] = Field(
+    # Override to make optional for backward compatibility with subclass construction
+    runnable_factory: Optional[Callable[[ExecutionContext], Runnable]] = Field(
         default=None,
-        description="Factory function that creates an Agent instance from context dict"
+        description="Factory function that creates a Runnable from ExecutionContext"
     )
     
-    # Adapters
-    input_adapter: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = Field(
+    # Adapters using ExecutionContext
+    input_adapter: Optional[Callable[[ExecutionContext], ExecutionContext]] = Field(
         default=None,
-        description="Function to transform flow context into agent input"
+        description="Function to transform context before passing to Runnable"
     )
-    output_adapter: Optional[Callable[[BaseAgent, Dict[str, Any]], Dict[str, Any]]] = Field(
+    output_adapter: Optional[Callable[[Runnable, ExecutionContext], Dict[str, Any]]] = Field(
         default=None,
-        description="Function to extract agent output and update flow context"
+        description="Function to extract output and return context updates"
     )
     
     # Routing
-    next_node_selector: Optional[Callable[[Dict[str, Any]], Optional[str]]] = Field(
+    next_node_selector: Optional[Callable[[ExecutionContext], Optional[str]]] = Field(
         default=None,
         description="Function to select next node ID based on context"
     )
     
     class Config:
         arbitrary_types_allowed = True
-    
-    def get_runnable_factory(self) -> Callable[[ExecutionContext], Runnable]:
-        """Get a runnable factory, converting from agent_factory if needed"""
-        if self.runnable_factory:
-            return self.runnable_factory
-        
-        if self.agent_factory:
-            def wrapped_factory(context: ExecutionContext) -> Runnable:
-                return self.agent_factory(context.to_dict())
-            return wrapped_factory
-        
-        raise ValueError(f"Node {self.id} has no runnable_factory or agent_factory")
 
 
 class BaseFlow(Runnable):
     """Abstract base class for managing multi-agent flows
     
     BaseFlow extends Runnable to be part of the unified execution framework.
-    It orchestrates multiple agents or sub-flows.
+    It orchestrates multiple Runnables (Agents or sub-Flows).
     
     As a Runnable, BaseFlow can:
     1. Execute independently
@@ -96,7 +77,7 @@ class BaseFlow(Runnable):
         session_id: Session ID for this flow instance
         name: Flow name
         nodes: List of flow nodes to execute
-        context: Shared context between nodes
+        _context: Shared ExecutionContext between nodes
     """
     
     flow_id: str = Field(..., description="Unique flow instance ID")
@@ -104,10 +85,6 @@ class BaseFlow(Runnable):
     
     nodes: List[FlowNode] = Field(
         default_factory=list, description="List of flow nodes to execute"
-    )
-    
-    context: Dict[str, Any] = Field(
-        default_factory=dict, description="Shared context between nodes"
     )
     
     character_id: Optional[str] = Field(
@@ -120,8 +97,12 @@ class BaseFlow(Runnable):
         description="List of character IDs that can see messages from this flow"
     )
     
+    # Internal context (use _context to avoid serialization)
+    _context: Optional[ExecutionContext] = None
+    
     class Config:
         arbitrary_types_allowed = True
+        underscore_attrs_are_private = True
     
     def __init__(self, **data):
         """Initialize BaseFlow"""
@@ -133,44 +114,6 @@ class BaseFlow(Runnable):
             data["flow_id"] = data["id"]
         super().__init__(**data)
     
-    @property
-    def legacy_state(self) -> FlowState:
-        """Get the legacy FlowState (for backward compatibility)"""
-        state_mapping = {
-            ExecutionState.IDLE: FlowState.IDLE,
-            ExecutionState.RUNNING: FlowState.RUNNING,
-            ExecutionState.PAUSED: FlowState.PAUSED,
-            ExecutionState.FINISHED: FlowState.FINISHED,
-            ExecutionState.ERROR: FlowState.ERROR,
-        }
-        return state_mapping.get(self.state, FlowState.IDLE)
-    
-    @asynccontextmanager
-    async def state_context(self, new_state: Union[FlowState, ExecutionState]):
-        """Context manager for safe flow state transitions."""
-        if isinstance(new_state, FlowState):
-            state_mapping = {
-                FlowState.IDLE: ExecutionState.IDLE,
-                FlowState.RUNNING: ExecutionState.RUNNING,
-                FlowState.PAUSED: ExecutionState.PAUSED,
-                FlowState.FINISHED: ExecutionState.FINISHED,
-                FlowState.ERROR: ExecutionState.ERROR,
-            }
-            new_state = state_mapping.get(new_state, ExecutionState.IDLE)
-        
-        if not isinstance(new_state, ExecutionState):
-            raise ValueError(f"Invalid state: {new_state}")
-        
-        previous_state = self.state
-        self.state = new_state
-        try:
-            yield
-        except Exception as e:
-            self.state = ExecutionState.ERROR
-            raise e
-        finally:
-            self.state = previous_state
-    
     def on_event(self, event: ExecutionEvent) -> None:
         """Hook for handling flow events. Override for custom handling."""
         pass
@@ -178,36 +121,35 @@ class BaseFlow(Runnable):
     async def execute_node(
         self,
         node: FlowNode,
-        context: Dict[str, Any]
+        context: ExecutionContext
     ) -> AsyncIterator[ExecutionEvent]:
         """Execute a single flow node.
         
         Args:
             node: The node to execute
-            context: Current flow context (Dict)
+            context: Current execution context
             
         Yields:
-            ExecutionEvent: Events from the node's agent execution
+            ExecutionEvent: Events from the node's execution
         """
         try:
-            # Create agent instance using factory
-            agent = node.agent_factory(context)
+            # Get runnable factory and create instance
+            if not node.runnable_factory:
+                raise ValueError(f"Node {node.id} has no runnable_factory")
             
-            # Prepare agent input using input adapter
-            agent_input = {}
+            runnable = node.runnable_factory(context)
+            logger.info(f" {self.name} node '{node.id}' executing {type(runnable).__name__}")
+            
+            # Prepare input context using adapter
+            node_context = context
             if node.input_adapter:
-                agent_input = node.input_adapter(context)
-            else:
-                agent_input = {
-                    "request": context.get("user_input", ""),
-                    **{k: v for k, v in context.items() if k != "user_input"}
-                }
+                node_context = node.input_adapter(context)
             
-            # Execute agent with streaming
-            async for event in agent.run_stream(**agent_input):
-                # Skip agent's final event
+            # Execute runnable (Agent or Flow) with streaming
+            async for event in runnable.run_stream(node_context):
+                # Skip final events from child runnables
                 if event.type == "final":
-                    logger.debug(f" {self.name} node '{node.id}' agent completed")
+                    logger.debug(f" {self.name} node '{node.id}' runnable completed")
                     continue
                 
                 # Add flow info to event
@@ -219,15 +161,15 @@ class BaseFlow(Runnable):
                 self.on_event(event_with_flow)
                 yield event_with_flow
             
-            # Extract output using output adapter
+            # Extract output using adapter and update context
             if node.output_adapter:
-                updated_context = node.output_adapter(agent, context)
-                if updated_context:
-                    self.context.update(updated_context)
-                    logger.info(f" {self.name} node '{node.id}' updated context: {list(updated_context.keys())}")
+                updates = node.output_adapter(runnable, context)
+                if updates:
+                    self._context = context.merge(**updates)
+                    logger.info(f" {self.name} node '{node.id}' updated context: {list(updates.keys())}")
             
         except Exception as e:
-            logger.error(f"Error in node '{node.id}': {e}")
+            logger.error(f"Error in node '{node.id}': {e}", exc_info=True)
             yield ExecutionEvent(
                 type="error",
                 content=f"Node {node.name} failed: {str(e)}",
@@ -247,17 +189,17 @@ class BaseFlow(Runnable):
         
         Args:
             context: ExecutionContext, user_input string, or None
-            **kwargs: Additional context variables
+            **kwargs: Additional context data
             
         Yields:
             ExecutionEvent: Streaming events during execution.
         """
         pass
     
-    async def run(self, user_input: Optional[str] = None, **kwargs) -> str:
+    async def run(self, context: Union[ExecutionContext, str, None] = None, **kwargs) -> str:
         """Execute the flow and return result string."""
         buffer = []
-        async for event in self.run_stream(user_input, **kwargs):
+        async for event in self.run_stream(context, **kwargs):
             if event.type == "token" and event.content:
                 buffer.append(event.content)
         return "".join(buffer) if buffer else ""
@@ -267,7 +209,7 @@ class BaseFlow(Runnable):
         """Build the flow nodes. Subclasses must implement this."""
         pass
     
-    def _init_context_from_input(
+    def _init_context(
         self,
         context_or_input: Union[ExecutionContext, str, None],
         **kwargs

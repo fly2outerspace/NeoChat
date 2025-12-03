@@ -4,7 +4,7 @@ SequentialFlow executes nodes in sequence, supporting conditional routing
 based on node selectors.
 """
 
-from typing import AsyncIterator, Dict, List, Optional, Union
+from typing import AsyncIterator, List, Optional, Union
 
 from app.flow.base import BaseFlow, FlowNode
 from app.logger import logger
@@ -28,7 +28,7 @@ class SequentialFlow(BaseFlow):
         
         Args:
             context: ExecutionContext, user_input string, or None
-            **kwargs: Additional context variables
+            **kwargs: Additional context data
             
         Yields:
             ExecutionEvent: Streaming events during execution.
@@ -37,16 +37,9 @@ class SequentialFlow(BaseFlow):
             raise RuntimeError(f"Cannot run flow from state: {self.state}")
         
         # Initialize context
-        exec_context = self._init_context_from_input(context, **kwargs)
+        self._context = self._init_context(context, **kwargs)
         
-        # Update legacy Dict context
-        self.context = {
-            "user_input": exec_context.user_input or "",
-            "session_id": self.session_id,
-            **exec_context.data,
-        }
-        
-        logger.info(f" {self.name} flow running with context keys: {list(self.context.keys())}")
+        logger.info(f" {self.name} flow running with context: {list(self._context.data.keys())}")
         
         async with self.state_context(ExecutionState.RUNNING):
             # Create node map for quick lookup
@@ -82,12 +75,12 @@ class SequentialFlow(BaseFlow):
                 )
                 
                 # Execute node
-                async for event in self.execute_node(node, self.context):
+                async for event in self.execute_node(node, self._context):
                     yield event
                 
                 # Determine next node
                 if node.next_node_selector:
-                    next_node_id = node.next_node_selector(self.context)
+                    next_node_id = node.next_node_selector(self._context)
                     if next_node_id:
                         logger.info(f" {self.name} routing to: {next_node_id}")
                         current_node_id = next_node_id
@@ -110,17 +103,6 @@ class SequentialFlow(BaseFlow):
         """Get the starting node ID."""
         if self.nodes:
             return self.nodes[0].id
-        return None
-    
-    def _get_next_sequential_node(self, current_node_id: str, node_map: Dict[str, FlowNode]) -> Optional[str]:
-        """Get the next node ID in sequential order."""
-        node_ids = [node.id for node in self.nodes]
-        try:
-            current_index = node_ids.index(current_node_id)
-            if current_index + 1 < len(node_ids):
-                return node_ids[current_index + 1]
-        except ValueError:
-            pass
         return None
     
     def build_nodes(self) -> List[FlowNode]:

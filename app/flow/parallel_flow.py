@@ -36,10 +36,6 @@ class ParallelFlow(BaseFlow):
     2. Events from response nodes are streamed to HTTP response
     3. When ALL response nodes complete, HTTP response ends
     4. Background nodes continue running independently
-    
-    Attributes:
-        response_timeout: Optional timeout for response nodes (seconds)
-        background_timeout: Optional timeout for background tasks (seconds)
     """
     
     response_timeout: Optional[float] = Field(
@@ -72,7 +68,7 @@ class ParallelFlow(BaseFlow):
         
         Args:
             context: ExecutionContext, user_input string, or None
-            **kwargs: Additional context variables
+            **kwargs: Additional context data
             
         Yields:
             ExecutionEvent: Events from response nodes
@@ -81,12 +77,7 @@ class ParallelFlow(BaseFlow):
             raise RuntimeError(f"Cannot run flow from state: {self.state}")
         
         # Initialize context
-        exec_context = self._init_context_from_input(context, **kwargs)
-        self.context = {
-            "user_input": exec_context.user_input or "",
-            "session_id": self.session_id,
-            **exec_context.data,
-        }
+        self._context = self._init_context(context, **kwargs)
         
         # Reset internal state
         self._background_tasks = []
@@ -182,7 +173,7 @@ class ParallelFlow(BaseFlow):
         try:
             logger.info(f" {self.name} starting {'response' if is_response else 'background'} node: {node.id}")
             
-            async for event in self.execute_node(node, self.context):
+            async for event in self.execute_node(node, self._context):
                 await self._event_queue.put(event)
             
             await self._event_queue.put({
@@ -215,14 +206,7 @@ class ParallelFlow(BaseFlow):
             })
     
     async def wait_background_tasks(self, timeout: Optional[float] = None) -> Dict[str, bool]:
-        """Wait for all background tasks to complete.
-        
-        Args:
-            timeout: Max wait time (uses background_timeout if None)
-            
-        Returns:
-            Dict mapping task names to completion status
-        """
+        """Wait for all background tasks to complete."""
         if not self._background_tasks:
             return {}
         
