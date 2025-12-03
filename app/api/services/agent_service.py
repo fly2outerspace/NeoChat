@@ -1,27 +1,27 @@
-"""Agent service for managing agent instances and processing requests"""
+"""Agent service for managing agent instances"""
 from typing import Optional, List
+
 from app.agent.character import Character
-from app.llm import LLM
 from app.config import LLMSettings
+from app.llm import LLM
 from app.logger import logger
+from app.prompt.character import ROLEPLAY_PROMPT
 from app.tool import (
-    SendTelegramMessage,
-    SpeakInPerson,
-    GetCurrentTime,
-    PlanningTool,
-    Terminate,
-    ToolCollection,
     DialogueHistory,
-    WebSearch,
-    ScheduleReader,
-    ScheduleWriter,
+    Reflection,
+    RelationTool,
     ScenarioReader,
     ScenarioWriter,
-    RelationTool,
-    Reflection,
+    ScheduleReader,
+    ScheduleWriter,
+    SendTelegramMessage,
+    SpeakInPerson,
+    Terminate,
+    ToolCollection,
+    WebSearch,
 )
 
-from app.prompt.character import ROLEPLAY_PROMPT
+
 class AgentService:
     """Service for creating and managing agent instances"""
     
@@ -37,26 +37,27 @@ class AgentService:
         """Create a new agent instance
         
         Args:
-            session_id: Session ID for this agent (required)
+            session_id: Session ID (required)
             name: Agent name
-            roleplay_prompt: Roleplay prompt for character
+            roleplay_prompt: Roleplay prompt
             character_id: Optional character ID
-            llm_settings: Optional LLMSettings object. If not provided, uses default config from config.toml ("openai")
-        
-        Note: Each request should create a new agent instance.
-        LLM will be reused through its own singleton mechanism.
-        Memory will be automatically loaded from storage based on session_id.
+            llm_settings: Optional LLM settings
+            visible_for_characters: Character IDs that can see messages
+            
+        Returns:
+            Character agent instance
         """
         logger.info(f"Creating agent: {name} (character_id: {character_id}) for session: {session_id}")
-        # LLM will be reused through LLM._instances cache
-        if llm_settings is not None:
-            # Use provided settings directly
+        
+        # Create LLM
+        if llm_settings:
             llm = LLM(settings=llm_settings)
             logger.info(f"Using custom LLM settings: {llm_settings.model}")
         else:
-            # Use default config from config.toml ("openai")
             llm = LLM(config_name="openai")
-            logger.info(f"Using default LLM config from config.toml: openai")
+            logger.info("Using default LLM config from config.toml")
+        
+        # Create agent with tools
         agent = Character(
             session_id=session_id,
             name=name,
@@ -80,6 +81,5 @@ class AgentService:
             max_steps=10,
             visible_for_characters=visible_for_characters,
         )
+        
         return agent
-    
-    

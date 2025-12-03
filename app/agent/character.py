@@ -3,7 +3,7 @@ from typing import AsyncIterator, List, Optional, Literal
 from pydantic import Field
 
 from app.agent.toolcall import ToolCallAgent
-from app.schema import AgentStreamEvent, Message, ToolCall
+from app.schema import ExecutionEvent, Message, ToolCall
 from app.memory import Memory
 from app.utils.enums import MessageCategory, InputMode
 from app.utils.streaming import stream_by_category
@@ -197,7 +197,7 @@ class Character(ToolCallAgent):
 
     async def handle_tool_result_stream(
         self, command: ToolCall, result: ToolResult
-    ) -> AsyncIterator[AgentStreamEvent]:
+    ) -> AsyncIterator[ExecutionEvent]:
         """Handle tool result with immediate streaming for output tools"""
         message_type = command.function.name
         
@@ -209,7 +209,7 @@ class Character(ToolCallAgent):
         
         # Emit structured data if args exist
         if result.args:
-            yield AgentStreamEvent(
+            yield ExecutionEvent(
                 type="tool_output",
                 content=None,
                 message_type=message_type,
@@ -230,7 +230,7 @@ class Character(ToolCallAgent):
         if category in {MessageCategory.TELEGRAM, MessageCategory.SPEAK_IN_PERSON}:
             # Use category-specific streaming mode (typewriter for speak_in_person, line-by-line for telegram)
             async for chunk in stream_by_category(content, category):
-                yield AgentStreamEvent(
+                yield ExecutionEvent(
                     type="tool_output",
                     content=chunk,
                     message_type=message_type,
@@ -257,7 +257,7 @@ class Character(ToolCallAgent):
 
             # Stream the tool output so frontend can display progress
             for chunk in self._chunk_content(content):
-                yield AgentStreamEvent(
+                yield ExecutionEvent(
                     type="token",
                     content=chunk,
                     step=self.current_step,

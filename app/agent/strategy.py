@@ -1,25 +1,18 @@
-from ast import In
-from re import S
 from typing import List, Optional, Literal, AsyncIterator
 
 from pydantic import Field
 
 from app.agent.toolcall import ToolCallAgent
-from app.schema import Message
-from app.utils import get_current_time
-from app.utils.mapping import get_category_from_input_mode
-from app.utils.enums import InputMode
-from app.prompt.strategy import NEXT_STEP_PROMPT, SYSTEM_PROMPT
-from app.tool import Terminate, Strategy, ToolCollection, ToolResult, RelationTool
-from app.memory import Memory
 from app.logger import logger
-from app.utils.enums import MessageCategory
-from app.utils.mapping import CATEGORY_TO_INDICATOR_MAP, TOOL_CATEGORY_MAP
-from app.utils import get_current_datetime
-from app.utils.enums import ToolName, MessageType
-from app.utils.streaming import stream_by_category
-from app.schema import AgentStreamEvent, ToolCall
+from app.memory import Memory
+from app.prompt.strategy import NEXT_STEP_PROMPT, SYSTEM_PROMPT
+from app.schema import ExecutionEvent, Message, ToolCall
 from app.storage.scenario_store import ScenarioStore
+from app.tool import Terminate, Strategy, ToolCollection, ToolResult, RelationTool
+from app.utils import get_current_time, get_current_datetime
+from app.utils.enums import InputMode, MessageCategory, MessageType, ToolName
+from app.utils.mapping import get_category_from_input_mode, CATEGORY_TO_INDICATOR_MAP, TOOL_CATEGORY_MAP
+from app.utils.streaming import stream_by_category
 
 class StrategyAgent(ToolCallAgent):
     """Strategy agent class that extends ToolCallAgent with strategic planning behavior"""
@@ -236,7 +229,7 @@ class StrategyAgent(ToolCallAgent):
 
     async def handle_tool_result_stream(
         self, command: ToolCall, result: ToolResult
-    ) -> AsyncIterator[AgentStreamEvent]:
+    ) -> AsyncIterator[ExecutionEvent]:
         """Handle tool result with immediate streaming for output tools"""
         message_type = command.function.name
         
@@ -248,7 +241,7 @@ class StrategyAgent(ToolCallAgent):
         
         # Emit structured data if args exist
         if result.args:
-            yield AgentStreamEvent(
+            yield ExecutionEvent(
                 type="tool_output",
                 content=None,
                 message_type=message_type,
@@ -278,7 +271,7 @@ class StrategyAgent(ToolCallAgent):
         if command.function.name not in {ToolName.REFLECTION}:
             # for reflection in strategy, do not stream the result
             for chunk in self._chunk_content(content):
-                yield AgentStreamEvent(
+                yield ExecutionEvent(
                     type="token",
                     content=chunk,
                     step=self.current_step,
