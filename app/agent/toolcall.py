@@ -7,7 +7,7 @@ from pydantic import Field
 from app.agent.react import ReActAgent
 from app.logger import logger
 from app.prompt.toolcall import NEXT_STEP_PROMPT, SYSTEM_PROMPT
-from app.schema import AgentState, AgentStreamEvent, Message, ToolCall
+from app.schema import AgentState, ExecutionEvent, ExecutionState, Message, ToolCall
 from app.tool import CreateChatCompletion, Terminate, ToolCollection, ToolResult
 from app.utils.enums import ToolName
 from app.utils import get_current_time
@@ -141,7 +141,7 @@ class ToolCallAgent(ReActAgent):
             )
             return False
     
-    async def think_stream(self) -> AsyncIterator[AgentStreamEvent]:
+    async def think_stream(self) -> AsyncIterator[ExecutionEvent]:
         """Think with streaming events"""
         system_msgs = self.prepare_system_messages()
         messages = self.prepare_messages()
@@ -174,7 +174,7 @@ class ToolCallAgent(ReActAgent):
                 break
             if isinstance(delta, str):
                 content_chunks.append(delta)
-                yield AgentStreamEvent(
+                yield ExecutionEvent(
                     type="token",
                     content=delta,
                     step=self.current_step,
@@ -183,7 +183,7 @@ class ToolCallAgent(ReActAgent):
             elif isinstance(delta, dict) and delta.get("type") == "tool_call_delta":
                 message_type = delta.get("function", {}).get("name")
                 if message_type:
-                    yield AgentStreamEvent(
+                    yield ExecutionEvent(
                         type="tool_status",
                         content=f"🛠️ 正在准备工具: {message_type}",
                         step=self.current_step,
@@ -220,7 +220,7 @@ class ToolCallAgent(ReActAgent):
         # Emit tool selection status
         if self.tool_calls:
             tool_names = [call.function.name for call in self.tool_calls]
-            yield AgentStreamEvent(
+            yield ExecutionEvent(
                 type="tool_status",
                 content=f"🔧 准备调用工具: {', '.join(tool_names)}",
                 step=self.current_step,
@@ -239,7 +239,7 @@ class ToolCallAgent(ReActAgent):
                 if response.content:
                     current_time = get_current_time(session_id=self.session_id) if self.session_id else get_current_time()
                     self.memory.add_message(Message.assistant_message(response.content, speaker=self.name, created_at=current_time, visible_for_characters=self.visible_for_characters))
-                    yield AgentStreamEvent(
+                    yield ExecutionEvent(
                         type="tool_status",
                         content="✅ 思考完成",
                         step=self.current_step,
@@ -247,7 +247,7 @@ class ToolCallAgent(ReActAgent):
                         metadata={"should_act": True},
                     )
                     return
-                yield AgentStreamEvent(
+                yield ExecutionEvent(
                     type="tool_status",
                     content="✅ 思考完成",
                     step=self.current_step,
@@ -259,7 +259,7 @@ class ToolCallAgent(ReActAgent):
             # Check if we have no content and no tool calls - skip message creation and terminate
             if not response.content and not self.tool_calls:
                 logger.info(f" {self.name} has no content and no tool calls - skipping message and terminating")
-                yield AgentStreamEvent(
+                yield ExecutionEvent(
                     type="tool_status",
                     content="✅ 思考完成（无输出）",
                     step=self.current_step,
@@ -267,7 +267,7 @@ class ToolCallAgent(ReActAgent):
                     metadata={"should_act": False},
                 )
                 # Set state to FINISHED to terminate the agent
-                self.state = AgentState.FINISHED
+                self.state = ExecutionState.FINISHED
                 return
 
             # Create and add assistant message
@@ -284,7 +284,7 @@ class ToolCallAgent(ReActAgent):
             self.memory.add_message(assistant_msg)
 
             if self.tool_choices == "required" and not self.tool_calls:
-                yield AgentStreamEvent(
+                yield ExecutionEvent(
                     type="tool_status",
                     content="⚠️ 需要工具调用但未提供",
                     step=self.current_step,
@@ -295,7 +295,7 @@ class ToolCallAgent(ReActAgent):
 
             # For 'auto' mode, continue with content if no commands but content exists
             if self.tool_choices == "auto" and not self.tool_calls:
-                yield AgentStreamEvent(
+                yield ExecutionEvent(
                     type="tool_status",
                     content="✅ 思考完成",
                     step=self.current_step,
@@ -304,7 +304,7 @@ class ToolCallAgent(ReActAgent):
                 )
                 return
 
-            yield AgentStreamEvent(
+            yield ExecutionEvent(
                 type="tool_status",
                 content="✅ 思考完成",
                 step=self.current_step,
@@ -319,13 +319,13 @@ class ToolCallAgent(ReActAgent):
                     f"Error encountered while processing: {str(e)}", speaker=self.name, created_at=current_time, visible_for_characters=self.visible_for_characters
                 )
             )
-            yield AgentStreamEvent(
+            yield ExecutionEvent(
                 type="error",
                 content=f"思考过程出错: {str(e)}",
                 step=self.current_step,
                 total_steps=self.max_steps,
             )
-            yield AgentStreamEvent(
+            yield ExecutionEvent(
                 type="tool_status",
                 content="❌ 思考失败",
                 step=self.current_step,
@@ -335,7 +335,7 @@ class ToolCallAgent(ReActAgent):
 
     async def handle_tool_result_stream(
         self, command: ToolCall, result: ToolResult
-    ) -> AsyncIterator[AgentStreamEvent]:
+    ) -> AsyncIterator[ExecutionEvent]:
         """Handle tool result with streaming events"""
         # Store ToolResult for flow adapters to access
         self.tool_results[command.id] = result
@@ -350,7 +350,7 @@ class ToolCallAgent(ReActAgent):
 
         # Emit structured data if args exist
         if result.args:
-            yield AgentStreamEvent(
+            yield ExecutionEvent(
                 type="tool_output",
                 content=None,
                 message_type=command.function.name,
@@ -373,7 +373,7 @@ class ToolCallAgent(ReActAgent):
         
         # Stream the tool output so frontend can display progress
         for chunk in self._chunk_content(normalized_result):
-            yield AgentStreamEvent(
+            yield ExecutionEvent(
                 type="token",
                 content=chunk,
                 step=self.current_step,
@@ -404,11 +404,11 @@ class ToolCallAgent(ReActAgent):
             result_str = str(result)
             self.result += result_str
     
-    async def act_stream(self) -> AsyncIterator[AgentStreamEvent]:
+    async def act_stream(self) -> AsyncIterator[ExecutionEvent]:
         """Execute tool calls with streaming events"""
         if not self.tool_calls:
             if self.tool_choices == "required":
-                yield AgentStreamEvent(
+                yield ExecutionEvent(
                     type="error",
                     content="错误: 需要工具调用但未提供",
                     step=self.current_step,
@@ -424,7 +424,7 @@ class ToolCallAgent(ReActAgent):
             message_type = command.function.name
             
             # Emit tool start event
-            yield AgentStreamEvent(
+            yield ExecutionEvent(
                 type="tool_status",
                 content=f"🔧 正在执行工具: {message_type} ({idx + 1}/{total_tools})",
                 step=self.current_step,
@@ -437,7 +437,7 @@ class ToolCallAgent(ReActAgent):
                 result = await self.execute_tool(command)
                 
                 # Emit tool completion event
-                yield AgentStreamEvent(
+                yield ExecutionEvent(
                     type="tool_status",
                     content=f"✅ 工具 {message_type} 执行完成",
                     step=self.current_step,
@@ -452,7 +452,7 @@ class ToolCallAgent(ReActAgent):
                     
             except Exception as e:
                 # Emit tool error event
-                yield AgentStreamEvent(
+                yield ExecutionEvent(
                     type="error",
                     content=f"❌ 工具 {message_type} 执行失败: {str(e)}",
                     step=self.current_step,
@@ -517,7 +517,7 @@ class ToolCallAgent(ReActAgent):
         if self._should_finish_execution(name=name, result=result, **kwargs):
             # Set agent state to finished
             logger.info(f" Special tool '{name}' has completed the task!")
-            self.state = AgentState.FINISHED
+            self.state = ExecutionState.FINISHED
 
     @staticmethod
     def _should_finish_execution(**kwargs) -> bool:
