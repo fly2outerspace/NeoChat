@@ -15,12 +15,9 @@ from app.runnable.base import Runnable
 from app.runnable.context import ExecutionContext
 from app.tool import (
     DialogueHistory,
-    Reflection,
     RelationTool,
     ScenarioReader,
-    ScenarioWriter,
     ScheduleReader,
-    ScheduleWriter,
     SendTelegramMessage,
     SpeakInPerson,
     Strategy,
@@ -67,14 +64,11 @@ class CharacterFlow(SequentialFlow):
                 memory=memory,
                 available_tools=ToolCollection(
                     Strategy(),
-                    Reflection(),
                     Terminate(),
                     WebSearch(),
                     DialogueHistory(session_id=ctx.session_id, character_id=self.character_id),
                     ScheduleReader(session_id=ctx.session_id, character_id=self.character_id),
-                    ScheduleWriter(session_id=ctx.session_id, character_id=self.character_id),
                     ScenarioReader(session_id=ctx.session_id, character_id=self.character_id),
-                    ScenarioWriter(session_id=ctx.session_id, character_id=self.character_id),
                     RelationTool(session_id=ctx.session_id, character_id=self.character_id),
                 ),
                 visible_for_characters=ctx.visible_for_characters or self.visible_for_characters,
@@ -113,7 +107,7 @@ class CharacterFlow(SequentialFlow):
                 input_mode=ctx.data.get("input_mode"),
             )
         
-        def strategy_output_adapter(runnable: Runnable, ctx: ExecutionContext) -> Dict[str, Any]:
+        def strategy_output_adapter(runnable: Runnable, ctx: ExecutionContext) -> Optional[ExecutionContext]:
             """Extract strategy output and update context"""
             decision = None
             strategy = ""
@@ -127,9 +121,9 @@ class CharacterFlow(SequentialFlow):
             
             if decision is None or not decision:
                 logger.warning(f" {self.name} strategy agent did not provide valid decision")
-                return {}
+                return None
             
-            return {"decision": decision, "strategy": strategy}
+            return ctx.merge(decision=decision, strategy=strategy)
         
         def speak_input_adapter(ctx: ExecutionContext) -> ExecutionContext:
             """Transform context for speak agent input"""

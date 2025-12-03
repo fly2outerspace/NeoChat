@@ -524,10 +524,6 @@ class LLM:
         try:
             if tool_choice not in ["none", "auto", "required"]:
                 raise ValueError(f"Invalid tool_choice: {tool_choice}")
-
-            from pprint import pprint
-            for msg in messages:
-                pprint(msg.to_dict(), width=210)
                 
             # Format messages
             if system_msgs:
@@ -535,9 +531,13 @@ class LLM:
                 messages = system_msgs + self.format_messages(messages)
             else:
                 messages = self.format_messages(messages)
-                
+            
             # Validate and fix message sequence before sending to API
             messages = self._validate_and_fix_messages(messages)
+
+            # from pprint import pprint
+            # for msg in messages:
+            #     pprint(msg, width=210)
 
             # Log message sequence for debugging (only if there are tool messages)
             has_tool_messages = any(msg.get("role") == "tool" for msg in messages)

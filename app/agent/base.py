@@ -99,11 +99,7 @@ class BaseAgent(Runnable, ABC):
         elif self.memory.session_id != self.session_id:
             self.memory = Memory(session_id=self.session_id)
         
-        # Set id to match name if not explicitly set
-        if not hasattr(self, 'id') or self.id == "":
-            object.__setattr__(self, 'id', f"agent-{self.name}-{self.session_id[:8]}")
-        
-        logger.info(f"initialize agent: {self.name} with session_id: {self.session_id}")
+        logger.info(f"initialize agent: {self.name} (id: {self.id}) with session_id: {self.session_id}")
         return self
 
     @property
@@ -156,19 +152,19 @@ class BaseAgent(Runnable, ABC):
         finally:
             self.state = previous_state
 
-    def handle_user_input(self, request: str, **kwargs):
-        """Handle user input with optional parameters
+    def handle_user_input(self, context: ExecutionContext):
+        """Handle user input from ExecutionContext
         
         Args:
-            request: User input text
-            **kwargs: Optional parameters (e.g., input_mode for Character agent)
+            context: ExecutionContext containing user_input and additional data
         
-        Returns:
-            Message: Created user message
+        Subclasses can override to extract additional parameters from context.data
         """
-        created_at = get_current_time()
-        user_msg = Message.user_message(request, speaker="user", created_at=created_at, visible_for_characters=self.visible_for_characters)
-        self.memory.add_message(user_msg)
+        request = context.user_input
+        if request:
+            created_at = get_current_time()
+            user_msg = Message.user_message(request, speaker="user", created_at=created_at, visible_for_characters=self.visible_for_characters)
+            self.memory.add_message(user_msg)
 
     async def run_stream(
         self,
@@ -191,23 +187,26 @@ class BaseAgent(Runnable, ABC):
         Raises:
             RuntimeError: If the agent is not in IDLE state at start.
         """
-        # Handle different input types for backward compatibility
+        # Normalize input to ExecutionContext
         if isinstance(context, ExecutionContext):
-            request = context.user_input
-            # Extract kwargs from context.data
-            for key, value in context.data.items():
-                if key not in kwargs:
-                    kwargs[key] = value
+            exec_context = context
         elif isinstance(context, str):
-            request = context
+            exec_context = ExecutionContext(
+                session_id=self.session_id,
+                user_input=context,
+                data=kwargs
+            )
         else:
-            request = None
+            exec_context = ExecutionContext(
+                session_id=self.session_id,
+                data=kwargs
+            )
         
         if self.state != ExecutionState.IDLE:
             raise RuntimeError(f"Cannot run agent from state: {self.state}")
 
-        if request:
-            self.handle_user_input(request, **kwargs)
+        if exec_context.user_input:
+            self.handle_user_input(exec_context)
 
         async with self.state_context(ExecutionState.RUNNING):
             while (
@@ -218,11 +217,11 @@ class BaseAgent(Runnable, ABC):
                 
                 # Emit step start event
                 yield ExecutionEvent(
-                    type="step",
-                    content=f"步骤 {self.current_step}/{self.max_steps}",
-                    step=self.current_step,
-                    total_steps=self.max_steps,
-                )
+                        type="step",
+                        content=f"步骤 {self.current_step}/{self.max_steps}",
+                        step=self.current_step,
+                        total_steps=self.max_steps,
+                    )
 
                 # Execute step with streaming support
                 async for event in self.step_stream():

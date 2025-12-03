@@ -3,6 +3,7 @@ from typing import AsyncIterator, List, Optional, Literal
 from pydantic import Field
 
 from app.agent.toolcall import ToolCallAgent
+from app.runnable.context import ExecutionContext
 from app.schema import ExecutionEvent, Message, ToolCall
 from app.memory import Memory
 from app.utils.enums import MessageCategory, InputMode
@@ -73,10 +74,14 @@ class Character(ToolCallAgent):
                 formatted_messages.append(msg)
         return formatted_messages
 
-    def handle_user_input(self, request: str, **kwargs):
+    def handle_user_input(self, context: ExecutionContext):
+        """Handle user input from ExecutionContext"""
+        request = context.user_input
+        if not request:
+            return
         current_time = get_current_time(session_id=self.session_id)
-        # Get category based on input_mode from kwargs, default to PHONE
-        input_mode = kwargs.get("input_mode", InputMode.PHONE)
+        # Get category based on input_mode from context.data, default to PHONE
+        input_mode = context.data.get("input_mode", InputMode.PHONE)
         if input_mode != InputMode.SKIP:
             category = get_category_from_input_mode(input_mode)
             user_msg = Message.user_message(request, speaker="user", created_at=current_time, category=category, visible_for_characters=self.visible_for_characters)

@@ -228,7 +228,7 @@ async def generate_streaming_response(
         yield "data: [DONE]\n\n"
         
     except Exception as e:
-        logger.error(f"Error in streaming response: {e}", exc_info=True)
+        logger.error("Error in streaming response: %s", e, exc_info=True)
         error_chunk = {
             "id": response_id,
             "object": "chat.completion.chunk",
@@ -422,7 +422,7 @@ async def chat_completions(request: ChatCompletionRequest) -> Union[Dict[str, An
             raise HTTPException(status_code=503, detail="Service is busy")
         raise HTTPException(status_code=503, detail="Service not available")
     except Exception as e:
-        logger.error(f"Error processing chat request: {e}", exc_info=True)
+        logger.error("Error processing chat request: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -522,5 +522,5 @@ async def flow_completions(request: FlowCompletionRequest) -> Union[Dict[str, An
             raise HTTPException(status_code=503, detail="Service is busy")
         raise HTTPException(status_code=503, detail="Service not available")
     except Exception as e:
-        logger.error(f"Error processing flow request: {e}", exc_info=True)
+        logger.error("Error processing flow request: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

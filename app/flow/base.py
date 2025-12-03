@@ -10,7 +10,7 @@ A Flow is a composite Runnable - it contains and orchestrates child Runnables
 from abc import abstractmethod
 from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Union
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from app.logger import logger
 from app.runnable.base import Runnable
@@ -46,9 +46,9 @@ class FlowNode(RunnableNode):
         default=None,
         description="Function to transform context before passing to Runnable"
     )
-    output_adapter: Optional[Callable[[Runnable, ExecutionContext], Dict[str, Any]]] = Field(
+    output_adapter: Optional[Callable[[Runnable, ExecutionContext], Optional[ExecutionContext]]] = Field(
         default=None,
-        description="Function to extract output and return context updates"
+        description="Function to extract output and return updated context (or None if no updates)"
     )
     
     # Routing
@@ -80,7 +80,6 @@ class BaseFlow(Runnable):
         _context: Shared ExecutionContext between nodes
     """
     
-    flow_id: str = Field(..., description="Unique flow instance ID")
     session_id: str = Field(..., description="Session ID for this flow instance")
     
     nodes: List[FlowNode] = Field(
@@ -105,14 +104,25 @@ class BaseFlow(Runnable):
         underscore_attrs_are_private = True
     
     def __init__(self, **data):
-        """Initialize BaseFlow"""
-        if "id" not in data and "flow_id" in data:
-            data["id"] = data["flow_id"]
-        elif "id" not in data:
-            import uuid
-            data["id"] = f"flow-{uuid.uuid4().hex[:8]}"
-            data["flow_id"] = data["id"]
+        """Initialize BaseFlow
+        
+        Note: flow_id cannot be set directly. Use id instead.
+        flow_id is automatically mapped to id via property.
+        """
+        # Remove flow_id if provided (not allowed to set directly)
+        if "flow_id" in data:
+            data.pop("flow_id")
         super().__init__(**data)
+    
+    @property
+    def flow_id(self) -> str:
+        """flow_id is an alias for id (for backward compatibility)"""
+        return self.id
+    
+    @flow_id.setter
+    def flow_id(self, value: str) -> None:
+        """Setting flow_id also sets id"""
+        object.__setattr__(self, 'id', value)
     
     def on_event(self, event: ExecutionEvent) -> None:
         """Hook for handling flow events. Override for custom handling."""
@@ -163,10 +173,10 @@ class BaseFlow(Runnable):
             
             # Extract output using adapter and update context
             if node.output_adapter:
-                updates = node.output_adapter(runnable, context)
-                if updates:
-                    self._context = context.merge(**updates)
-                    logger.info(f" {self.name} node '{node.id}' updated context: {list(updates.keys())}")
+                updated_context = node.output_adapter(runnable, context)
+                if updated_context:
+                    self._context = updated_context
+                    logger.info(f" {self.name} node '{node.id}' updated context")
             
         except Exception as e:
             logger.error(f"Error in node '{node.id}': {e}", exc_info=True)

@@ -3,6 +3,7 @@ from typing import List, Optional
 from pydantic import Field
 
 from app.agent.chat import ChatAgent
+from app.runnable.context import ExecutionContext
 from app.schema import Message
 from app.utils.enums import ToolName
 from app.utils.enums import MessageCategory
@@ -107,9 +108,9 @@ class TelegramAgent(ChatAgent):
 
         return schedule_scenario_content, relations_content
 
-    def handle_user_input(self, request: str, **kwargs):
-
-        strategy = kwargs.get("strategy", "")
+    def handle_user_input(self, context: ExecutionContext):
+        """Handle user input from ExecutionContext"""
+        strategy = context.data.get("strategy", "")
         self.inner_thought = strategy
         
     def add_assistant_message(self, content: str, created_at: Optional[str] = None) -> None:

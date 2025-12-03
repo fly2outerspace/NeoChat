@@ -13,7 +13,7 @@ from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, AsyncIterator, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.runnable.context import ExecutionContext
 from app.schema import ExecutionEvent, ExecutionState
@@ -42,7 +42,7 @@ class Runnable(BaseModel, ABC):
     """
     
     # Identification
-    id: str = Field(..., description="Unique identifier")
+    id: Optional[str] = Field(default=None, description="Unique identifier (auto-generated if not provided)")
     name: str = Field(..., description="Human-readable name")
     
     # Execution state
@@ -54,6 +54,17 @@ class Runnable(BaseModel, ABC):
     class Config:
         arbitrary_types_allowed = True
         extra = "allow"  # Allow extra fields for flexibility in subclasses
+    
+    @model_validator(mode="after")
+    def generate_id(self) -> "Runnable":
+        """Auto-generate id if not provided"""
+        if not self.id:
+            import uuid
+            # Generate id based on class name and name
+            class_name = self.__class__.__name__.lower()
+            short_uuid = uuid.uuid4().hex[:8]
+            object.__setattr__(self, 'id', f"{class_name}-{self.name}-{short_uuid}")
+        return self
     
     @asynccontextmanager
     async def state_context(self, new_state: ExecutionState):

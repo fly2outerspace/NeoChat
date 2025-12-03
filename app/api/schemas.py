@@ -327,7 +327,7 @@ class FlowCompletionRequest(BaseModel):
     )
     stream: bool = Field(default=False, description="Whether to stream the response")
     session_id: str = Field(..., description="Session ID for conversation history (required)")
-    flow_type: str = Field(default="chat", description="Type of flow to use (default: 'chat')")
+    flow_type: str = Field(default="chat_parallel", description="Type of flow to use (default: 'chat_parallel')")
     character: Optional[CharacterInfo] = Field(None, description="Character information (optional)")
     model_info: Optional[ModelInfo] = Field(None, description="Model configuration (optional)")
     participants: Optional[List[str]] = Field(None, description="List of character IDs that messages from this flow should be visible to (None means visible to all)")

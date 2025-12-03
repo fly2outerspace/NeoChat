@@ -488,9 +488,9 @@ class ToolCallAgent(ReActAgent):
 
             # Format result for display
             logger.info(
-                f"Observed output of cmd `{name}` executed: {str(result)}"
+                f"{self.id}: observed output of cmd `{name}` executed:\n {str(result)}"
                 if result
-                else f"Cmd `{name}` completed with no output"
+                else f"{self.id}: cmd `{name}` completed with no output"
             )
 
             # Handle special tools like `finish`

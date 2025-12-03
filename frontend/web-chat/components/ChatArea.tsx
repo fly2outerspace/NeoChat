@@ -769,7 +769,7 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
         
         // Flow 模式需要添加 flow_type
         if (chatMode === 'flow') {
-          requestBody.flow_type = 'character';
+          requestBody.flow_type = 'chat_parallel';
         }
         
         const res = await fetch(endpoint, {

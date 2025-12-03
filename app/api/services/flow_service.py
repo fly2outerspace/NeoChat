@@ -3,8 +3,7 @@ from typing import Optional, List
 
 from app.config import LLMSettings
 from app.flow.base import BaseFlow
-from app.flow.character_flow import CharacterFlow
-from app.flow.parallel_flow import ParallelFlow
+from app.flow.chat_parallel_flow import ChatParallelFlow
 from app.llm import LLM
 from app.logger import logger
 from app.prompt.character import ROLEPLAY_PROMPT
@@ -15,7 +14,7 @@ class FlowService:
     
     @staticmethod
     def create_flow(
-        flow_type: str = "character",
+        flow_type: str = "chat_parallel",
         session_id: str = "",
         flow_id: Optional[str] = None,
         name: Optional[str] = None,
@@ -28,9 +27,7 @@ class FlowService:
         """Create a new flow instance
         
         Args:
-            flow_type: Type of flow to create
-                - "character": Sequential flow (strategy -> speak/telegram)
-                - "parallel": Parallel flow with background task support
+            flow_type: Type of flow to create (only "chat_parallel" is supported)
             session_id: Session ID (required)
             flow_id: Optional flow ID (auto-generated if not provided)
             name: Character/flow name
@@ -41,12 +38,15 @@ class FlowService:
             **kwargs: Additional flow configuration
             
         Returns:
-            Flow instance
+            ChatParallelFlow instance
         """
         if not session_id:
             raise ValueError("session_id is required for flow creation")
         
-        logger.info(f"Creating flow: {flow_type} for session: {session_id}")
+        if flow_type != "chat_parallel":
+            raise ValueError(f"Only 'chat_parallel' flow type is supported. Got: {flow_type}")
+        
+        logger.info(f"Creating chat_parallel flow for session: {session_id}")
         
         # Create LLM instances if settings provided
         chat_llm = None
@@ -58,10 +58,13 @@ class FlowService:
         else:
             logger.info("Using default LLM config from config.toml")
         
-        # Common flow kwargs
+        # Flow kwargs
         flow_kwargs = {
             "session_id": session_id,
-            "name": name or "flow",
+            "name": name or "chat_parallel_flow",
+            "roleplay_prompt": roleplay_prompt or ROLEPLAY_PROMPT,
+            "chat_llm": chat_llm,
+            "strategy_llm": strategy_llm,
             "visible_for_characters": visible_for_characters,
             "character_id": character_id,
         }
@@ -69,18 +72,4 @@ class FlowService:
             flow_kwargs["flow_id"] = flow_id
         flow_kwargs.update(kwargs)
         
-        if flow_type in ("character", "chat"):
-            flow_kwargs.update({
-                "name": name or "character_flow",
-                "roleplay_prompt": roleplay_prompt or ROLEPLAY_PROMPT,
-                "chat_llm": chat_llm,
-                "strategy_llm": strategy_llm,
-            })
-            return CharacterFlow(**flow_kwargs)
-        
-        elif flow_type == "parallel":
-            # ParallelFlow - subclass should define nodes
-            return ParallelFlow(**flow_kwargs)
-        
-        else:
-            raise ValueError(f"Unknown flow type: {flow_type}. Supported: 'character', 'parallel'")
+        return ChatParallelFlow(**flow_kwargs)

@@ -1,44 +1,54 @@
-from typing import List, Optional, Literal, AsyncIterator
+"""WriterAgent: A silent agent that executes without streaming output
+
+WriterAgent is based on StrategyAgent but removes all streaming output functionality.
+It executes tools and processes results silently in the background without emitting
+events to the HTTP response stream.
+"""
+
+from typing import List, Optional, AsyncIterator
 
 from pydantic import Field
 
 from app.agent.toolcall import ToolCallAgent
 from app.logger import logger
 from app.memory import Memory
-from app.prompt.strategy import NEXT_STEP_PROMPT, SYSTEM_PROMPT
+from app.prompt.writer import NEXT_STEP_PROMPT, SYSTEM_PROMPT
 from app.runnable.context import ExecutionContext
 from app.schema import ExecutionEvent, Message, ToolCall
 from app.storage.scenario_store import ScenarioStore
-from app.tool import Terminate, Strategy, ToolCollection, ToolResult, RelationTool
+from app.tool import Terminate, ToolCollection, ToolResult, RelationTool
 from app.utils import get_current_time, get_current_datetime
 from app.utils.enums import InputMode, MessageCategory, MessageType, ToolName
 from app.utils.mapping import get_category_from_input_mode, CATEGORY_TO_INDICATOR_MAP, TOOL_CATEGORY_MAP
-from app.utils.streaming import stream_by_category
 
-class StrategyAgent(ToolCallAgent):
-    """Strategy agent class that extends ToolCallAgent with strategic planning behavior"""
 
-    name: str = "strategy"
-    description: str = "an agent that focuses on strategic planning and long-term decision-making."
+class WriterAgent(ToolCallAgent):
+    """WriterAgent: Silent agent based on StrategyAgent without streaming output
+    
+    This agent executes tools and processes results without emitting any events
+    to the HTTP response stream. It's designed for background tasks that should
+    run silently.
+    """
+
+    name: str = "writer"
+    description: str = "an agent that executes silently without streaming output."
     system_prompt: str = SYSTEM_PROMPT
     next_step_prompt: str = NEXT_STEP_PROMPT
     
     available_tools: ToolCollection = Field(
         default_factory=lambda: ToolCollection(
-            Terminate(), Strategy()
+            Terminate()
         )
     )
 
-    tool_choices: Literal["none", "auto", "required"] = "required"
+    tool_choices: str = "required"
     
     roleplay_prompt: Optional[str] = None
     history_messages: List[Message] = Field(default_factory=list)
-    special_tool_names: List[str] = Field(default_factory=lambda: [ToolName.TERMINATE, ToolName.STRATEGY])
+    special_tool_names: List[str] = Field(default_factory=lambda: [ToolName.TERMINATE])
 
-
-    # Note: This agent's messages don't include historical tool messages, so messages from user onwards in this execution won't be formatted. It's better to format user messages separately.
     def _format_messages(self, messages: List[Message]) -> List[Message]:
-        """Format messages for strategy agent
+        """Format messages for writer agent
         Filter messages with tool calls into a clean assistant-user dialogue list
         - System messages: kept unchanged
         - Assistant/tool messages (category 1,2,3): converted to assistant with formatted content
@@ -63,7 +73,7 @@ class StrategyAgent(ToolCallAgent):
                     # Convert assistant or tool message to assistant message with formatted content
                     indicator = CATEGORY_TO_INDICATOR_MAP.get(msg.category, "")
                     formatted_content = f"{msg.created_at} - {indicator} - {msg.speaker}: {msg.content}"
-                    if msg.speaker != self.name: # TODO: Should use character_id for filtering instead of speaker in the future
+                    if msg.speaker != self.name:
                         formatted_msg = Message.user_message(
                             content=formatted_content,
                             speaker=msg.speaker,
@@ -127,8 +137,6 @@ class StrategyAgent(ToolCallAgent):
         """Prepare system messages for the agent"""
         current_time = get_current_time(session_id=self.session_id)
         long_term_memory, relationship = self.prepare_memory_content()
-        logger.info(f"{self.name}'s long_term_memory: \n{long_term_memory}")
-        logger.info(f"{self.name}'s relationship: \n{relationship}")
         system_prompt = self.system_prompt.format(
             roleplay_prompt=self.roleplay_prompt,
             long_term_memory=long_term_memory, 
@@ -138,7 +146,7 @@ class StrategyAgent(ToolCallAgent):
         return [system_msg]
 
     def prepare_memory_content(self) -> tuple[str, str]:
-        """Prepare memory content for strategy agent.
+        """Prepare memory content for writer agent.
         
         1) One message: Display all schedules and scenarios (including future plans) for the current session, sorted by start_at.
            Format: One line per item: [start_at ~ end_at] schedule content or scenario title.
@@ -234,57 +242,87 @@ class StrategyAgent(ToolCallAgent):
     async def handle_tool_result_stream(
         self, command: ToolCall, result: ToolResult
     ) -> AsyncIterator[ExecutionEvent]:
-        """Handle tool result with immediate streaming for output tools"""
-        message_type = command.function.name
+        """Handle tool result silently without streaming output
         
+        This method overrides the base implementation to remove all streaming.
+        It only stores the result and logs internally.
+        """
         # Store ToolResult for flow adapters to access
         self.tool_results[command.id] = result
         
-        # Get text content for display
+        # Get text content for logging (not streaming)
         content = str(result) or ""
         
-        # Emit structured data if args exist
-        if result.args:
-            yield ExecutionEvent(
-                type="tool_output",
-                content=None,
-                message_type=message_type,
-                message_id=command.id,
-                step=self.current_step,
-                total_steps=self.max_steps,
-                metadata={
-                    "structured_data": result.args,
-                    "result_type": command.function.name
-                }
-            )
-        
-        # Get category from mapping, default to TOOL for character layer
-        # For other tools not in the mapping, use TOOL category
+        # Get category from mapping, default to TOOL
         category = TOOL_CATEGORY_MAP.get(command.function.name, MessageCategory.TOOL)
  
-        # Normalize the result
+        # Log internally (no streaming)
         logger.info(
-            f" Tool '{command.function.name}' completed its mission!"
+            f" {self.name} tool '{command.function.name}' completed silently"
         )
         
-        # display strategy as inner thought here
-        if command.function.name == ToolName.STRATEGY:
-            message_type = MessageType.INNER_THOUGHT
-
-        # Stream the tool output so frontend can display progress
-        for chunk in self._chunk_content(content):
-            yield ExecutionEvent(
-                type="token",
-                content=chunk,
-                step=self.current_step,
-                total_steps=self.max_steps,
-                message_type=message_type,
-                message_id=command.id,
-            )
-        # Add tool response to memory with TOOL category
+        # Add tool response to memory with TOOL category (no streaming)
         current_time = get_current_time(session_id=self.session_id) if self.session_id else get_current_time()
         tool_msg = Message.tool_message(
-            content=content, tool_name=command.function.name, tool_call_id=command.id, speaker=self.name, created_at=current_time, category=category,
+            content=content, 
+            tool_name=command.function.name, 
+            tool_call_id=command.id, 
+            speaker=self.name, 
+            created_at=current_time, 
+            category=category,
             visible_for_characters=self.visible_for_characters
         )
         self.memory.add_message(tool_msg)
+        
+        # No events yielded - silent execution
+        # Yield nothing to make this an async generator
+        if False:
+            yield
+    
+    async def act_stream(self) -> AsyncIterator[ExecutionEvent]:
+        """Execute tool calls silently without streaming output
+        
+        Overrides the base implementation to execute tools without emitting events.
+        """
+        # Yield nothing to make this an async generator (must be before any return)
+        if False:
+            yield
+        
+        if not self.tool_calls:
+            if self.tool_choices == "required":
+                raise ValueError("Tool calls required but none provided")
+            return  # Empty async generator
+
+        # Execute tools silently
+        for command in self.tool_calls:
+            try:
+                result = await self.execute_tool(command)
+                # Handle tool result silently (no streaming)
+                async for _ in self.handle_tool_result_stream(command, result):
+                    pass  # Consume events but don't yield them
+            except Exception as e:
+                logger.error(f" {self.name} tool '{command.function.name}' error: {e}")
+                error_result = ToolResult(error=f"Error: {str(e)}")
+                async for _ in self.handle_tool_result_stream(command, error_result):
+                    pass  # Consume events but don't yield them
+    
+    async def step_stream(self) -> AsyncIterator[ExecutionEvent]:
+        """Execute a single step silently without streaming output
+        
+        Overrides the base implementation to use non-streaming think() and act_stream()
+        methods. act_stream() is overridden to be silent.
+        """
+        # Yield nothing to make this an async generator (must be before any return)
+        if False:
+            yield
+        
+        # Use non-streaming think() method
+        should_act = await self.think()
+        
+        if not should_act:
+            return  # Empty async generator
+        
+        # Use silent act_stream() method
+        async for _ in self.act_stream():
+            pass  # Consume events but don't yield them
+
