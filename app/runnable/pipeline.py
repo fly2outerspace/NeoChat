@@ -10,7 +10,7 @@ from pydantic import Field
 
 from app.runnable.base import Runnable
 from app.runnable.context import ExecutionContext
-from app.schema import ExecutionEvent, ExecutionState
+from app.schema import ExecutionEvent, ExecutionEventType, ExecutionState
 
 
 class Pipeline(Runnable):
@@ -54,7 +54,7 @@ class Pipeline(Runnable):
                 
                 # Execute stage and yield events with path
                 async for event in stage.run_stream(current_context):
-                    if event.type == "final":
+                    if event.type == ExecutionEventType.DONE:
                         # Don't yield intermediate final events
                         continue
                     
@@ -65,7 +65,7 @@ class Pipeline(Runnable):
         
         # Yield final event for the pipeline
         yield ExecutionEvent(
-            type="final",
+            type=ExecutionEventType.DONE,
             execution_path=[self.id]
         )
     

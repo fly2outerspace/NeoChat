@@ -7,7 +7,7 @@ from app.logger import logger
 from app.memory import Memory
 from app.prompt.strategy import NEXT_STEP_PROMPT, SYSTEM_PROMPT
 from app.runnable.context import ExecutionContext
-from app.schema import ExecutionEvent, Message, ToolCall
+from app.schema import ExecutionEvent, ExecutionEventType, Message, ToolCall
 from app.storage.scenario_store import ScenarioStore
 from app.tool import Terminate, Strategy, ToolCollection, ToolResult, RelationTool
 from app.utils import get_current_time, get_current_datetime
@@ -246,7 +246,7 @@ class StrategyAgent(ToolCallAgent):
         # Emit structured data if args exist
         if result.args:
             yield ExecutionEvent(
-                type="tool_output",
+                type=ExecutionEventType.TOKEN,
                 content=None,
                 message_type=message_type,
                 message_id=command.id,
@@ -274,7 +274,7 @@ class StrategyAgent(ToolCallAgent):
         # Stream the tool output so frontend can display progress
         for chunk in self._chunk_content(content):
             yield ExecutionEvent(
-                type="token",
+                type=ExecutionEventType.TOKEN,
                 content=chunk,
                 step=self.current_step,
                 total_steps=self.max_steps,

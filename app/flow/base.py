@@ -16,7 +16,7 @@ from app.logger import logger
 from app.runnable.base import Runnable
 from app.runnable.context import ExecutionContext
 from app.runnable.node import RunnableNode
-from app.schema import ExecutionEvent, ExecutionState
+from app.schema import ExecutionEvent, ExecutionEventType, ExecutionState
 
 
 class FlowNode(RunnableNode):
@@ -136,8 +136,8 @@ class BaseFlow(Runnable):
             
             # Execute runnable (Agent or Flow) with streaming
             async for event in runnable.run_stream(node_context):
-                # Skip final events from child runnables
-                if event.type == "final":
+                # Skip done events from child runnables
+                if event.type == ExecutionEventType.DONE:
                     logger.debug(f" {self.name} node '{node.id}' runnable completed")
                     continue
                 
@@ -160,7 +160,7 @@ class BaseFlow(Runnable):
         except Exception as e:
             logger.error(f"Error in node '{node.id}': {e}", exc_info=True)
             yield ExecutionEvent(
-                type="error",
+                type=ExecutionEventType.ERROR,
                 content=f"Node {node.name} failed: {str(e)}",
                 flow_id=self.id,
                 node_id=node.id,
@@ -189,7 +189,7 @@ class BaseFlow(Runnable):
         """Execute the flow and return result string."""
         buffer = []
         async for event in self.run_stream(context, **kwargs):
-            if event.type == "token" and event.content:
+            if event.type == ExecutionEventType.TOKEN and event.content:
                 buffer.append(event.content)
         return "".join(buffer) if buffer else ""
     

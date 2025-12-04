@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, AsyncIterator, List, Optional
 from pydantic import BaseModel, Field, model_validator
 
 from app.runnable.context import ExecutionContext
-from app.schema import ExecutionEvent, ExecutionState
+from app.schema import ExecutionEvent, ExecutionEventType, ExecutionState
 
 if TYPE_CHECKING:
     from app.runnable.pipeline import Pipeline
@@ -133,7 +133,7 @@ class Runnable(BaseModel, ABC):
         """
         tokens = []
         async for event in self.run_stream(context):
-            if event.type == "token" and event.content:
+            if event.type == ExecutionEventType.TOKEN and event.content:
                 tokens.append(event.content)
         return "".join(tokens)
     

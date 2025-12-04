@@ -21,6 +21,7 @@ from app.runnable.base import Runnable
 from app.runnable.context import ExecutionContext
 from app.schema import (
     ExecutionEvent,
+    ExecutionEventType,
     ExecutionState,
     Message,
 )
@@ -195,7 +196,7 @@ class BaseAgent(Runnable, ABC):
                 
                 # Emit step start event
                 yield ExecutionEvent(
-                        type="step",
+                        type=ExecutionEventType.STEP,
                         content=f"步骤 {self.current_step}/{self.max_steps}",
                         step=self.current_step,
                         total_steps=self.max_steps,
@@ -213,7 +214,7 @@ class BaseAgent(Runnable, ABC):
                 logger.warning(f"Terminated: Reached max steps ({self.max_steps})")
 
         # Emit final event
-        yield ExecutionEvent(type="final")
+        yield ExecutionEvent(type=ExecutionEventType.DONE)
 
     async def run(self, request: Optional[str] = None, **kwargs) -> str:
         """Execute the agent's main loop asynchronously.
@@ -230,7 +231,7 @@ class BaseAgent(Runnable, ABC):
         """
         buffer = []
         async for event in self.run_stream(request, **kwargs):
-            if event.type == "token" and event.content:
+            if event.type == ExecutionEventType.TOKEN and event.content:
                 buffer.append(event.content)
         return "".join(buffer) if buffer else self.result
 

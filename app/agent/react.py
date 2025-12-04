@@ -12,7 +12,7 @@ from pydantic import Field
 from app.agent.base import BaseAgent
 from app.llm import LLM
 from app.memory import Memory
-from app.schema import ExecutionEvent, ExecutionState
+from app.schema import ExecutionEvent, ExecutionEventType, ExecutionState
 
 
 class ReActAgent(BaseAgent, ABC):
@@ -75,7 +75,7 @@ class ReActAgent(BaseAgent, ABC):
         """
         # Emit thinking status
         yield ExecutionEvent(
-            type="tool_status",
+            type=ExecutionEventType.STATUS,
             content="🧠 正在思考...",
             step=self.current_step,
             total_steps=self.max_steps,
@@ -93,7 +93,7 @@ class ReActAgent(BaseAgent, ABC):
         if should_act is None:
             should_act = await self.think()
             yield ExecutionEvent(
-                type="tool_status",
+                type=ExecutionEventType.STATUS,
                 content="✅ 思考完成",
                 step=self.current_step,
                 total_steps=self.max_steps,

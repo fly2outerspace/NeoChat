@@ -18,7 +18,7 @@ from pydantic import Field
 from app.flow.base import BaseFlow, FlowNode
 from app.logger import logger
 from app.runnable.context import ExecutionContext
-from app.schema import ExecutionEvent, ExecutionState
+from app.schema import ExecutionEvent, ExecutionEventType, ExecutionState
 
 
 class ParallelFlow(BaseFlow):
@@ -115,7 +115,7 @@ class ParallelFlow(BaseFlow):
             
             # Emit start event
             yield ExecutionEvent(
-                type="flow_step",
+                type=ExecutionEventType.STEP,
                 content=f"开始并行执行 {len(response_nodes)} 个响应节点",
                 flow_id=self.id,
             )
@@ -148,14 +148,14 @@ class ParallelFlow(BaseFlow):
             except Exception as e:
                 logger.error(f" {self.name} error: {e}")
                 yield ExecutionEvent(
-                    type="error",
+                    type=ExecutionEventType.ERROR,
                     content=f"Parallel flow error: {e}",
                     flow_id=self.id,
                 )
         
         # Emit final event
         yield ExecutionEvent(
-            type="final",
+            type=ExecutionEventType.DONE,
             flow_id=self.id,
             metadata={
                 "background_tasks": len(self._background_tasks),
@@ -194,7 +194,7 @@ class ParallelFlow(BaseFlow):
         except Exception as e:
             logger.error(f" {self.name} node '{node.id}' error: {e}")
             await self._event_queue.put(ExecutionEvent(
-                type="error",
+                type=ExecutionEventType.ERROR,
                 content=f"Node {node.name} failed: {e}",
                 flow_id=self.id,
                 node_id=node.id,

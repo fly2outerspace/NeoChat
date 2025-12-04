@@ -3,6 +3,7 @@ from typing import List, Optional, Literal, Dict, Any
 
 from pydantic import BaseModel, Field
 
+from app.schema import ExecutionEventType
 from app.utils.enums import InputMode
 
 
@@ -453,7 +454,7 @@ class SSEEvent(BaseModel):
         Done:   {"type": "done"}
         Error:  {"type": "error", "content": "Something went wrong"}
     """
-    type: Literal["token", "status", "done", "error"] = Field(
+    type: ExecutionEventType = Field(
         ..., description="Event type"
     )
     content: Optional[str] = Field(
@@ -494,20 +495,20 @@ class SSEEvent(BaseModel):
     def create_token(cls, content: str, tool: Optional[SSEToolInfo] = None, 
                      stage: Optional[str] = None, node_id: Optional[str] = None) -> "SSEEvent":
         """Create a token event"""
-        return cls(type="token", content=content, tool=tool, stage=stage, node_id=node_id)
+        return cls(type=ExecutionEventType.TOKEN, content=content, tool=tool, stage=stage, node_id=node_id)
     
     @classmethod
     def create_status(cls, status: str, stage: Optional[str] = None, 
                       node_id: Optional[str] = None) -> "SSEEvent":
         """Create a status event"""
-        return cls(type="status", status=status, stage=stage, node_id=node_id)
+        return cls(type=ExecutionEventType.STATUS, status=status, stage=stage, node_id=node_id)
     
     @classmethod
     def create_done(cls) -> "SSEEvent":
         """Create a done event"""
-        return cls(type="done")
+        return cls(type=ExecutionEventType.DONE)
     
     @classmethod
     def create_error(cls, content: str, stage: Optional[str] = None) -> "SSEEvent":
         """Create an error event"""
-        return cls(type="error", content=content, stage=stage)
+        return cls(type=ExecutionEventType.ERROR, content=content, stage=stage)

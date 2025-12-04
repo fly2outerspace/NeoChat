@@ -25,6 +25,18 @@ class ExecutionState(str, Enum):
     ERROR = "error"
 
 
+class ExecutionEventType(str, Enum):
+    """Event types for execution streaming
+    
+    Unified event types used by both ExecutionEvent (internal) and SSEEvent (API).
+    """
+    TOKEN = "token"      # Text content chunk
+    STATUS = "status"    # Status/progress update
+    STEP = "step"        # Execution step marker
+    DONE = "done"        # Execution complete
+    ERROR = "error"      # Error occurred
+
+
 class ControlSignal(str, Enum):
     """Control signals for execution flow"""
     TERMINATE = "terminate"  # Terminate all execution immediately
@@ -237,14 +249,12 @@ class Relation(BaseModel):
 class ExecutionEvent(BaseModel):
     """Unified streaming event for all Runnables (Agents and Flows)
     
-    Event Types:
-    - token: Content token (streaming text)
-    - tool_status: Tool execution status update
-    - tool_output: Tool execution output
-    - step: Step marker (agent or flow step)
-    - flow_step: Flow-specific step marker
-    - final: Execution complete
-    - error: Error occurred
+    Event Types (ExecutionEventType):
+    - TOKEN: Text content chunk (streaming text, tool output)
+    - STATUS: Status/progress update (tool status, thinking status)
+    - STEP: Execution step marker (agent step, flow node step)
+    - DONE: Execution complete
+    - ERROR: Error occurred
     
     Attributes:
         type: Event type
@@ -261,16 +271,8 @@ class ExecutionEvent(BaseModel):
         metadata: Additional metadata
     """
     
-    # Event type - supports all legacy types
-    type: Literal[
-        "token",        # Content token (streaming text)
-        "tool_status",  # Tool/status update
-        "tool_output",  # Tool/output data
-        "step",         # Step marker
-        "flow_step",    # Flow step marker
-        "final",        # Execution complete
-        "error",        # Error occurred
-    ] = Field(..., description="Event type")
+    # Event type
+    type: ExecutionEventType = Field(..., description="Event type")
     
     # Content
     content: Optional[str] = Field(
@@ -368,34 +370,24 @@ class ExecutionEvent(BaseModel):
     @classmethod
     def token(cls, content: str, **kwargs) -> "ExecutionEvent":
         """Create a token event"""
-        return cls(type="token", content=content, **kwargs)
+        return cls(type=ExecutionEventType.TOKEN, content=content, **kwargs)
     
     @classmethod
     def status(cls, content: str, **kwargs) -> "ExecutionEvent":
-        """Create a tool_status event"""
-        return cls(type="tool_status", content=content, **kwargs)
-    
-    @classmethod
-    def output(cls, content: str, **kwargs) -> "ExecutionEvent":
-        """Create a tool_output event"""
-        return cls(type="tool_output", content=content, **kwargs)
+        """Create a status event"""
+        return cls(type=ExecutionEventType.STATUS, content=content, **kwargs)
     
     @classmethod
     def error(cls, content: str, **kwargs) -> "ExecutionEvent":
         """Create an error event"""
-        return cls(type="error", content=content, **kwargs)
+        return cls(type=ExecutionEventType.ERROR, content=content, **kwargs)
     
     @classmethod
-    def final(cls, **kwargs) -> "ExecutionEvent":
-        """Create a final event"""
-        return cls(type="final", **kwargs)
+    def done(cls, **kwargs) -> "ExecutionEvent":
+        """Create a done event"""
+        return cls(type=ExecutionEventType.DONE, **kwargs)
     
     @classmethod
     def step_event(cls, step: int, total_steps: Optional[int] = None, content: Optional[str] = None, **kwargs) -> "ExecutionEvent":
         """Create a step event"""
-        return cls(type="step", step=step, total_steps=total_steps, content=content, **kwargs)
-    
-    @classmethod
-    def flow_step_event(cls, content: str, flow_id: str, node_id: Optional[str] = None, stage: Optional[str] = None, **kwargs) -> "ExecutionEvent":
-        """Create a flow_step event"""
-        return cls(type="flow_step", content=content, flow_id=flow_id, node_id=node_id, stage=stage, **kwargs)
+        return cls(type=ExecutionEventType.STEP, step=step, total_steps=total_steps, content=content, **kwargs)

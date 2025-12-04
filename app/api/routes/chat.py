@@ -22,7 +22,7 @@ from app.api.services.flow_service import FlowService
 from app.config import LLMSettings
 from app.logger import logger
 from app.prompt.character import ROLEPLAY_PROMPT
-from app.schema import ExecutionEvent
+from app.schema import ExecutionEvent, ExecutionEventType
 from app.utils.enums import ToolName, InputMode
 from app.utils import remove_empty_lines
 
@@ -70,30 +70,8 @@ async def generate_streaming_response(
         async for event in runnable.run_stream(user_input, **kwargs):
             sse_event = None
             
-            if event.type == "token":
-                if event.content:
-                    cleaned_content = remove_empty_lines(event.content)
-                    if not cleaned_content:
-                        continue
-                    # Build tool info if present
-                    tool_info = None
-                    if event.message_type and event.message_id:
-                        tool_info = SSEToolInfo(name=event.message_type, id=event.message_id)
-                    sse_event = SSEEvent.create_token(
-                        content=cleaned_content,
-                        tool=tool_info,
-                        stage=event.stage,
-                        node_id=event.node_id,
-                    )
-            
-            elif event.type == "tool_status":
-                sse_event = SSEEvent.create_status(
-                    status=event.content or "",
-                    stage=event.stage,
-                    node_id=event.node_id,
-                )
-            
-            elif event.type == "tool_output":
+            # TOKEN: Text content (streaming text, tool output)
+            if event.type == ExecutionEventType.TOKEN:
                 if event.content:
                     cleaned_content = remove_empty_lines(event.content)
                     if not cleaned_content:
@@ -108,14 +86,24 @@ async def generate_streaming_response(
                         node_id=event.node_id,
                     )
             
-            elif event.type in ("step", "flow_step"):
+            # STATUS: Progress/status update
+            elif event.type == ExecutionEventType.STATUS:
                 sse_event = SSEEvent.create_status(
                     status=event.content or "",
                     stage=event.stage,
                     node_id=event.node_id,
                 )
             
-            elif event.type == "final":
+            # STEP: Execution step marker
+            elif event.type == ExecutionEventType.STEP:
+                sse_event = SSEEvent.create_status(
+                    status=event.content or "",
+                    stage=event.stage,
+                    node_id=event.node_id,
+                )
+            
+            # DONE: Execution complete
+            elif event.type == ExecutionEventType.DONE:
                 if event.content:
                     cleaned_content = remove_empty_lines(event.content)
                     if cleaned_content:
@@ -124,7 +112,8 @@ async def generate_streaming_response(
                 yield "data: [DONE]\n\n"
                 return
             
-            elif event.type == "error":
+            # ERROR: Error occurred
+            elif event.type == ExecutionEventType.ERROR:
                 sse_event = SSEEvent.create_error(
                     content=event.content or "Unknown error",
                     stage=event.stage,
@@ -140,70 +129,6 @@ async def generate_streaming_response(
     except Exception as e:
         logger.error("Error in streaming response: %s", e, exc_info=True)
         yield SSEEvent.create_error(content=str(e)).to_sse()
-        yield "data: [DONE]\n\n"
-
-
-# Legacy OpenAI format support (kept for reference, can be removed if not needed)
-async def _generate_openai_streaming_response(
-    runnable,
-    user_input: str,
-    response_id: str,
-    model: str,
-    input_mode: Optional[InputMode] = None,
-) -> AsyncIterator[str]:
-    """Generate streaming SSE response in OpenAI format (legacy).
-    
-    This function is kept for backward compatibility with OpenAI clients.
-    New code should use generate_streaming_response() with SSEEvent format.
-    """
-    created = int(time.time())
-    
-    def make_chunk(delta: dict, finish_reason: Optional[str] = None) -> str:
-        chunk = {
-            "id": response_id,
-            "object": "chat.completion.chunk",
-            "created": created,
-            "model": model,
-            "choices": [{"index": 0, "delta": delta, "finish_reason": finish_reason}]
-        }
-        return f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
-    
-    try:
-        kwargs = {}
-        if input_mode:
-            kwargs["input_mode"] = input_mode
-        
-        async for event in runnable.run_stream(user_input, **kwargs):
-            if event.type == "token" and event.content:
-                cleaned = remove_empty_lines(event.content)
-                if cleaned:
-                    yield make_chunk({"content": cleaned})
-            elif event.type == "final":
-                if event.content:
-                    cleaned = remove_empty_lines(event.content)
-                    if cleaned:
-                        yield make_chunk({"content": cleaned})
-                yield make_chunk({}, "stop")
-                yield "data: [DONE]\n\n"
-                return
-        
-        yield make_chunk({}, "stop")
-        yield "data: [DONE]\n\n"
-        
-    except Exception as e:
-        logger.error("Error in streaming response: %s", e, exc_info=True)
-        error_chunk = {
-            "id": response_id,
-            "object": "chat.completion.chunk",
-            "created": created,
-            "model": model,
-            "choices": [{
-                "index": 0,
-                "delta": {"tool_status": f"❌ 错误: {str(e)}"},
-                "finish_reason": "stop"
-            }]
-        }
-        yield f"data: {json.dumps(error_chunk, ensure_ascii=False)}\n\n"
         yield "data: [DONE]\n\n"
 
 
@@ -230,8 +155,10 @@ async def gather_response(
         kwargs["input_mode"] = input_mode
     
     async for event in runnable.run_stream(user_input, **kwargs):
-        if event.type == "token":
+        # TOKEN events: text content and tool output
+        if event.type == ExecutionEventType.TOKEN:
             if event.message_type and event.message_type.lower() not in {tool.value for tool in INLINE_TOOL_NAMES}:
+                # External tool output - collect separately
                 key = event.message_id or event.message_type
                 entry = tool_outputs_map.setdefault(
                     key,
@@ -243,24 +170,11 @@ async def gather_response(
                 )
                 entry.content += event.content or ""
             else:
+                # Inline tool output or regular text - add to content
                 if event.content:
                     content_segments.append(event.content)
-        elif event.type == "tool_output":
-            if event.message_type and event.message_type.lower() in {tool.value for tool in INLINE_TOOL_NAMES}:
-                if event.content:
-                    content_segments.append(event.content)
-            elif event.message_type and event.content:
-                key = event.message_id or event.message_type
-                entry = tool_outputs_map.setdefault(
-                    key,
-                    ToolOutputMessage(
-                        tool_name=event.message_type,
-                        content="",
-                        tool_call_id=event.message_id,
-                    ),
-                )
-                entry.content += event.content
-        elif event.type == "final":
+        # DONE event: execution complete
+        elif event.type == ExecutionEventType.DONE:
             break
 
     raw_content = "".join(content_segments)

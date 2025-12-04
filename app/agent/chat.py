@@ -7,7 +7,7 @@ from pydantic import Field
 from app.agent.base import BaseAgent
 from app.logger import logger
 from app.prompt.chat import SYSTEM_PROMPT
-from app.schema import ExecutionEvent, ExecutionState, Message
+from app.schema import ExecutionEvent, ExecutionEventType, ExecutionState, Message
 from app.utils import get_current_time
 from app.utils.enums import MessageCategory
 
@@ -91,7 +91,7 @@ class ChatAgent(BaseAgent):
                 break
             collected_content.append(delta)
             yield ExecutionEvent(
-                type="token",
+                type=ExecutionEventType.TOKEN,
                 content=delta,
                 step=self.current_step,
                 total_steps=self.max_steps,
@@ -132,7 +132,7 @@ class ChatAgent(BaseAgent):
             self.state = ExecutionState.ERROR
             # Emit error event for frontend
             yield ExecutionEvent(
-                type="error",
+                type=ExecutionEventType.ERROR,
                 content=error_msg,
                 step=self.current_step,
                 total_steps=self.max_steps,

@@ -11,7 +11,7 @@ from pydantic import Field
 
 from app.runnable.base import Runnable
 from app.runnable.context import ExecutionContext
-from app.schema import ExecutionEvent, ExecutionState
+from app.schema import ExecutionEvent, ExecutionEventType, ExecutionState
 from app.logger import logger
 
 
@@ -67,7 +67,7 @@ class ParallelGroup(Runnable):
             except Exception as e:
                 logger.error(f"Error in parallel runnable {runnable.name}: {e}")
                 await event_queue.put(ExecutionEvent(
-                    type="error",
+                    type=ExecutionEventType.ERROR,
                     content=f"Parallel task {runnable.name} failed: {e}",
                     execution_path=[self.id, f"parallel_{idx}_{runnable.name}"]
                 ))
@@ -103,7 +103,7 @@ class ParallelGroup(Runnable):
         
         # Yield final event
         yield ExecutionEvent(
-            type="final",
+            type=ExecutionEventType.DONE,
             execution_path=[self.id]
         )
     

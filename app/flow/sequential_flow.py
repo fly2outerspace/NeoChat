@@ -9,7 +9,7 @@ from typing import AsyncIterator, List, Optional, Union
 from app.flow.base import BaseFlow, FlowNode
 from app.logger import logger
 from app.runnable.context import ExecutionContext
-from app.schema import ExecutionEvent, ExecutionState
+from app.schema import ExecutionEvent, ExecutionEventType, ExecutionState
 
 
 class SequentialFlow(BaseFlow):
@@ -66,7 +66,7 @@ class SequentialFlow(BaseFlow):
                 
                 # Emit flow step event
                 yield ExecutionEvent(
-                    type="flow_step",
+                    type=ExecutionEventType.STEP,
                     content=f"执行节点 {step_count}: {node.name}",
                     step=step_count,
                     flow_id=self.id,
@@ -95,7 +95,7 @@ class SequentialFlow(BaseFlow):
         
         # Emit final event
         yield ExecutionEvent(
-            type="final",
+            type=ExecutionEventType.DONE,
             flow_id=self.id,
         )
     
