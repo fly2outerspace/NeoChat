@@ -99,7 +99,10 @@ class BaseAgent(Runnable, ABC):
         elif self.memory.session_id != self.session_id:
             self.memory = Memory(session_id=self.session_id)
         
-        logger.info(f"initialize agent: {self.name} (id: {self.id}) with session_id: {self.session_id}")
+        config_name = getattr(self.llm, 'config_name', 'custom')
+        model_name = getattr(self.llm, 'model', 'unknown')
+
+        logger.info(f"initialize agent: {self.id} with session_id: {self.session_id}, LLM config: {config_name}, model: {model_name}")
         return self
 
     @property

@@ -45,14 +45,14 @@ class ChatParallelFlow(ParallelFlow):
     
     # LLM instances
     chat_llm: Optional[LLM] = None
-    strategy_llm: Optional[LLM] = None
+    infer_llm: Optional[LLM] = None
     
     def _initialize_llms(self):
         """Initialize default LLM instances if not provided"""
         if self.chat_llm is None:
             self.chat_llm = LLM(config_name="openai")
-        if self.strategy_llm is None:
-            self.strategy_llm = LLM(config_name="openai")
+        if self.infer_llm is None:
+            self.infer_llm = LLM(config_name="openai")
     
     def build_nodes(self) -> List[FlowNode]:
         """Build the flow nodes for ChatParallelFlow"""
@@ -65,7 +65,7 @@ class ChatParallelFlow(ParallelFlow):
                 name=self.name,
                 roleplay_prompt=self.roleplay_prompt,
                 character_id=self.character_id,
-                llm=self.strategy_llm,
+                llm=self.infer_llm,
                 memory=memory,
                 available_tools=ToolCollection(
                     Reflection(),
@@ -89,7 +89,7 @@ class ChatParallelFlow(ParallelFlow):
                 roleplay_prompt=self.roleplay_prompt,
                 character_id=self.character_id,
                 chat_llm=self.chat_llm,
-                strategy_llm=self.strategy_llm,
+                infer_llm=self.infer_llm,
                 visible_for_characters=ctx.visible_for_characters or self.visible_for_characters,
             )
         

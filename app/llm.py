@@ -84,7 +84,7 @@ class LLM:
             base_url=self.base_url,
             default_headers=default_headers if default_headers else None
         )
-    
+
     @staticmethod
     def _get_settings_from_config(config_name: str) -> LLMSettings:
         """Get LLMSettings from global config by name."""

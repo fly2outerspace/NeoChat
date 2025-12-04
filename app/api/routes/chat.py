@@ -32,6 +32,9 @@ INLINE_TOOL_NAMES = {ToolName.SEND_TELEGRAM_MESSAGE, ToolName.SPEAK_IN_PERSON}
 
 def _get_model_name(request) -> str:
     """Get model name from request or default config"""
+    # Priority: chat_modelinfo > model_info (deprecated) > default config
+    if hasattr(request, 'chat_modelinfo') and request.chat_modelinfo:
+        return request.chat_modelinfo.model
     if hasattr(request, 'model_info') and request.model_info:
         return request.model_info.model
     
@@ -341,8 +344,18 @@ async def chat_completions(request: ChatCompletionRequest) -> Union[Dict[str, An
             _upsert_character(character_id, character_name, roleplay_prompt)
         
         # Extract LLM settings
+        # Priority: chat_modelinfo > model_info (deprecated) > default config
         llm_settings = None
-        if request.model_info:
+        if request.chat_modelinfo:
+            llm_settings = LLMSettings(
+                model=request.chat_modelinfo.model,
+                base_url=request.chat_modelinfo.base_url,
+                api_key=request.chat_modelinfo.api_key or "",
+                max_tokens=request.chat_modelinfo.max_tokens,
+                temperature=request.chat_modelinfo.temperature,
+                api_type=request.chat_modelinfo.api_type,
+            )
+        elif request.model_info:
             llm_settings = LLMSettings(
                 model=request.model_info.model,
                 base_url=request.model_info.base_url,
@@ -434,10 +447,22 @@ async def flow_completions(request: FlowCompletionRequest) -> Union[Dict[str, An
             raise HTTPException(status_code=400, detail="session_id is required")
         session_id = request.session_id
         
-        # Extract LLM settings
-        llm_settings = None
-        if request.model_info:
-            llm_settings = LLMSettings(
+        # Extract LLM settings for chat and inference models
+        # Priority: chat_modelinfo/infer_modelinfo > model_info (deprecated) > default config
+        chat_llm_settings = None
+        infer_llm_settings = None
+        
+        if request.chat_modelinfo:
+            chat_llm_settings = LLMSettings(
+                model=request.chat_modelinfo.model,
+                base_url=request.chat_modelinfo.base_url,
+                api_key=request.chat_modelinfo.api_key or "",
+                max_tokens=request.chat_modelinfo.max_tokens,
+                temperature=request.chat_modelinfo.temperature,
+                api_type=request.chat_modelinfo.api_type,
+            )
+        elif request.model_info:
+            chat_llm_settings = LLMSettings(
                 model=request.model_info.model,
                 base_url=request.model_info.base_url,
                 api_key=request.model_info.api_key or "",
@@ -445,6 +470,29 @@ async def flow_completions(request: FlowCompletionRequest) -> Union[Dict[str, An
                 temperature=request.model_info.temperature,
                 api_type=request.model_info.api_type,
             )
+        
+        if request.infer_modelinfo:
+            infer_llm_settings = LLMSettings(
+                model=request.infer_modelinfo.model,
+                base_url=request.infer_modelinfo.base_url,
+                api_key=request.infer_modelinfo.api_key or "",
+                max_tokens=request.infer_modelinfo.max_tokens,
+                temperature=request.infer_modelinfo.temperature,
+                api_type=request.infer_modelinfo.api_type,
+            )
+        elif request.model_info:
+            # Use same model for inference if only model_info is provided
+            infer_llm_settings = LLMSettings(
+                model=request.model_info.model,
+                base_url=request.model_info.base_url,
+                api_key=request.model_info.api_key or "",
+                max_tokens=request.model_info.max_tokens,
+                temperature=request.model_info.temperature,
+                api_type=request.model_info.api_type,
+            )
+        elif chat_llm_settings:
+            # Use chat model for inference if only chat_modelinfo is provided
+            infer_llm_settings = chat_llm_settings
         
         # Extract character info
         character_name = "character_flow"
@@ -465,15 +513,21 @@ async def flow_completions(request: FlowCompletionRequest) -> Union[Dict[str, An
         input_mode = request.input_mode or InputMode.PHONE
         participants = request.participants if hasattr(request, 'participants') else None
         
-        # Create flow
+        # Create flow with chat and inference LLM settings
+        from app.llm import LLM
+        chat_llm = LLM(settings=chat_llm_settings) if chat_llm_settings else None
+        infer_llm = LLM(settings=infer_llm_settings) if infer_llm_settings else None
+        
         flow = FlowService.create_flow(
             flow_type=request.flow_type,
             session_id=session_id,
             name=character_name,
             roleplay_prompt=roleplay_prompt,
-            llm_settings=llm_settings,
+            llm_settings=None,  # Don't use single llm_settings, use chat_llm and infer_llm instead
             visible_for_characters=participants,
             character_id=character_id,
+            chat_llm=chat_llm,
+            infer_llm=infer_llm,
         )
         
         logger.info(f"Processing flow request for session {session_id}: {user_input[:50]}...")

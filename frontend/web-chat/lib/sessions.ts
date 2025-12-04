@@ -399,8 +399,35 @@ export function saveSessionMessages(sessionId: string, messages: Message[]): voi
                         resolve();
                       })
                       .catch((err) => {
-                        console.error(`Failed to update message ${dbMsg.client_message_id}:`, err);
-                        resolve();
+                        // If update fails (e.g., 404 not found), fallback to create new message
+                        // This can happen when database was reset or archive was switched
+                        console.debug(`Update failed for message ${dbMsg.client_message_id}, attempting to create new:`, err.message);
+                        createFrontendMessage({
+                          session_id: sessionId,
+                          client_message_id: dbMsg.client_message_id,
+                          role: dbMsg.role,
+                          message_kind: dbMsg.message_kind,
+                          content: normalizedContent,
+                          tool_name: dbMsg.tool_name,
+                          tool_call_id: dbMsg.tool_call_id,
+                          input_mode: dbMsg.input_mode,
+                          character_id: dbMsg.character_id,
+                          display_order: dbMsg.display_order,
+                          created_at: (dbMsg as any).created_at,
+                        })
+                          .then((savedMessage) => {
+                            setClientMessageCacheEntry(sessionId, dbMsg.client_message_id, {
+                              id: savedMessage.id,
+                              content: normalizedContent,
+                              tool_name: normalizedToolName,
+                            });
+                            resolve();
+                          })
+                          .catch((createErr) => {
+                            // Silently ignore if create also fails (might be duplicate)
+                            console.debug(`Create fallback also failed for ${dbMsg.client_message_id}:`, createErr.message);
+                            resolve();
+                          });
                       });
                   }, index * 15);
                 })

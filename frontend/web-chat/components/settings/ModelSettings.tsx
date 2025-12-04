@@ -16,6 +16,9 @@ import { useLocalStorageInput } from '@/lib/useLocalStorageInput';
 export default function ModelSettings() {
   const [models, setModels] = useState<Model[]>([]);
   const [selectedModel, setSelectedModel] = useState<Model | null>(null);
+  const [inferModel, setInferModel] = useState<Model | null>(null);
+  const [useSameModelForInfer, setUseSameModelForInfer] = useState<boolean>(true);
+  const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -256,16 +259,45 @@ export default function ModelSettings() {
         }
       }
       
+      // 辅助函数：保存模型到 localStorage 并触发事件
+      const saveAndNotifyModel = (model: Model, isChatModel: boolean, isInferModel: boolean) => {
+        const modelInfo = {
+          model_id: model.model_id,
+          name: model.name,
+          provider: model.provider,
+          model: model.model,
+          base_url: model.base_url,
+          api_key: model.api_key || null,
+          max_tokens: model.max_tokens,
+          temperature: model.temperature,
+          api_type: model.api_type,
+        };
+        
+        if (isChatModel) {
+          localStorage.setItem('selected_model', JSON.stringify(modelInfo));
+          window.dispatchEvent(new CustomEvent('chatModelUpdated', { detail: modelInfo }));
+        }
+        if (isInferModel) {
+          localStorage.setItem('selected_infer_model', JSON.stringify(modelInfo));
+          window.dispatchEvent(new CustomEvent('inferModelUpdated', { detail: modelInfo }));
+        }
+      };
+
+      // 用于跟踪最终选中的模型
+      let finalSelectedModel: Model | null = null;
+      
       // 如果有选中的模型，更新它（需要重新获取以包含 API key）
       if (selectedModel) {
         try {
           const updated = await getModel(selectedModel.model_id, true);
           setSelectedModel(updated);
+          finalSelectedModel = updated;
         } catch (e) {
           // 如果获取失败，使用列表中的数据
           const updated = data.find(m => m.model_id === selectedModel.model_id);
           if (updated) {
             setSelectedModel(updated);
+            finalSelectedModel = updated;
           } else {
             setSelectedModel(null);
           }
@@ -275,16 +307,54 @@ export default function ModelSettings() {
         try {
           const fullModel = await getModel(modelToSelect.model_id, true);
           setSelectedModel(fullModel);
+          finalSelectedModel = fullModel;
         } catch (e) {
           setSelectedModel(modelToSelect);
+          finalSelectedModel = modelToSelect;
         }
       } else if (data.length > 0) {
         // 如果没有选中的模型，自动选择第一个
         try {
           const firstModel = await getModel(data[0].model_id, true);
           setSelectedModel(firstModel);
+          finalSelectedModel = firstModel;
         } catch (e) {
           setSelectedModel(data[0]);
+          finalSelectedModel = data[0];
+        }
+      }
+
+      // 加载推理模型设置
+      const storedInferModel = localStorage.getItem('selected_infer_model');
+      const storedUseSameModel = localStorage.getItem('use_same_model_for_infer');
+      
+      // 使用局部变量来避免 React 状态异步更新的问题
+      const shouldUseSameModel = storedUseSameModel === null || storedUseSameModel === 'true';
+      setUseSameModelForInfer(shouldUseSameModel);
+      
+      // 保存对话模型到 localStorage 并触发事件
+      if (finalSelectedModel) {
+        console.log('[ModelSettings] loadModels - saving final model:', finalSelectedModel.model);
+        saveAndNotifyModel(finalSelectedModel, true, shouldUseSameModel);
+      }
+      
+      // 如果不使用相同模型，加载独立的推理模型
+      if (!shouldUseSameModel && storedInferModel) {
+        try {
+          const inferModelInfo = JSON.parse(storedInferModel);
+          const found = data.find(m => m.model_id === inferModelInfo.model_id);
+          if (found) {
+            try {
+              const fullModel = await getModel(found.model_id, true);
+              setInferModel(fullModel);
+              saveAndNotifyModel(fullModel, false, true);
+            } catch (e) {
+              setInferModel(found);
+              saveAndNotifyModel(found, false, true);
+            }
+          }
+        } catch (e) {
+          console.error('Failed to parse stored infer model:', e);
         }
       }
     } catch (err: any) {
@@ -297,10 +367,12 @@ export default function ModelSettings() {
 
   const handleSelectModel = async (model: Model) => {
     setIsCreating(false);
+    console.log('[ModelSettings] User selected model:', model.model, model.model_id);
     try {
       // 获取完整模型信息（包含 API key）
       const fullModel = await getModel(model.model_id, true);
       setSelectedModel(fullModel);
+      console.log('[ModelSettings] Got full model info:', fullModel.model);
       
       // 保存到 localStorage（全局应用）
       const modelInfo = {
@@ -315,9 +387,16 @@ export default function ModelSettings() {
         api_type: fullModel.api_type,
       };
       localStorage.setItem('selected_model', JSON.stringify(modelInfo));
+      console.log('[ModelSettings] Saved to localStorage and dispatching chatModelUpdated:', modelInfo.model);
       
-      // 触发自定义事件，通知其他组件模型已更新
-      window.dispatchEvent(new CustomEvent('modelUpdated', { detail: modelInfo }));
+      // 触发自定义事件，通知其他组件对话模型已更新（selectedModel就是对话模型）
+      window.dispatchEvent(new CustomEvent('chatModelUpdated', { detail: modelInfo }));
+      
+      // 如果使用相同模型作为推理模型，也更新推理模型
+      if (useSameModelForInfer) {
+        localStorage.setItem('selected_infer_model', JSON.stringify(modelInfo));
+        window.dispatchEvent(new CustomEvent('inferModelUpdated', { detail: modelInfo }));
+      }
     } catch (e) {
       // 如果获取失败，使用列表中的数据
       setSelectedModel(model);
@@ -335,7 +414,13 @@ export default function ModelSettings() {
         api_type: model.api_type,
       };
       localStorage.setItem('selected_model', JSON.stringify(modelInfo));
-      window.dispatchEvent(new CustomEvent('modelUpdated', { detail: modelInfo }));
+      window.dispatchEvent(new CustomEvent('chatModelUpdated', { detail: modelInfo }));
+      
+      // 如果使用相同模型作为推理模型，也更新推理模型
+      if (useSameModelForInfer) {
+        localStorage.setItem('selected_infer_model', JSON.stringify(modelInfo));
+        window.dispatchEvent(new CustomEvent('inferModelUpdated', { detail: modelInfo }));
+      }
     }
   };
 
@@ -518,6 +603,7 @@ export default function ModelSettings() {
         </div>
       )}
 
+
       {/* 模型设置区域 */}
       <div className="bg-slate-950 border border-slate-700 rounded-lg overflow-hidden">
         <div className="flex" style={{ height: 'calc(100vh - 200px)', minHeight: '600px' }}>
@@ -548,7 +634,7 @@ export default function ModelSettings() {
                         key={model.model_id}
                         className={`group relative p-3 rounded-md cursor-pointer transition-colors ${
                           isSelected
-                            ? 'bg-sky-600/30 border-2 border-sky-500 shadow-lg shadow-sky-500/20'
+                            ? 'border-2 border-sky-500'
                             : 'hover:bg-slate-800 border border-transparent'
                         }`}
                         onClick={() => handleSelectModel(model)}
@@ -942,6 +1028,117 @@ export default function ModelSettings() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* 进阶设置 */}
+      <div className="mt-6 bg-slate-950 border border-slate-700 rounded-lg overflow-hidden">
+        <button
+          onClick={() => setAdvancedSettingsOpen(!advancedSettingsOpen)}
+          className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-slate-900 transition-colors"
+        >
+          <span className="text-sm font-medium text-slate-300">进阶设置</span>
+          <svg
+            className={`w-5 h-5 text-slate-400 transition-transform ${advancedSettingsOpen ? 'transform rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        
+        {advancedSettingsOpen && (
+          <div className="p-4 border-t border-slate-700">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  推理模型设置
+                </label>
+                <p className="text-xs text-slate-400 mb-3">
+                  推理模型只为flow模式提供，用于调整非对话模型
+                </p>
+                
+                <select
+                  value={useSameModelForInfer ? '__same_as_chat__' : (inferModel?.model_id || '')}
+                  onChange={async (e) => {
+                    const value = e.target.value;
+                    if (value === '__same_as_chat__') {
+                      // 选择"同对话模型"
+                      setUseSameModelForInfer(true);
+                      localStorage.setItem('use_same_model_for_infer', 'true');
+                      // 更新推理模型为当前选中的模型
+                      if (selectedModel) {
+                        const modelInfo = {
+                          model_id: selectedModel.model_id,
+                          name: selectedModel.name,
+                          provider: selectedModel.provider,
+                          model: selectedModel.model,
+                          base_url: selectedModel.base_url,
+                          api_key: selectedModel.api_key,
+                          max_tokens: selectedModel.max_tokens,
+                          temperature: selectedModel.temperature,
+                          api_type: selectedModel.api_type,
+                        };
+                        localStorage.setItem('selected_infer_model', JSON.stringify(modelInfo));
+                        window.dispatchEvent(new CustomEvent('inferModelUpdated', { detail: modelInfo }));
+                      }
+                    } else {
+                      // 选择其他模型
+                      setUseSameModelForInfer(false);
+                      localStorage.setItem('use_same_model_for_infer', 'false');
+                      const selected = models.find(m => m.model_id === value);
+                      if (selected) {
+                        try {
+                          // Get full model info including API key
+                          const fullModel = await getModel(selected.model_id, true);
+                          setInferModel(fullModel);
+                          const modelInfo = {
+                            model_id: fullModel.model_id,
+                            name: fullModel.name,
+                            provider: fullModel.provider,
+                            model: fullModel.model,
+                            base_url: fullModel.base_url,
+                            api_key: fullModel.api_key,
+                            max_tokens: fullModel.max_tokens,
+                            temperature: fullModel.temperature,
+                            api_type: fullModel.api_type,
+                          };
+                          localStorage.setItem('selected_infer_model', JSON.stringify(modelInfo));
+                          window.dispatchEvent(new CustomEvent('inferModelUpdated', { detail: modelInfo }));
+                        } catch (e) {
+                          // If getModel fails, use list data (may not have API key)
+                          console.error('Failed to get full infer model info:', e);
+                          setInferModel(selected);
+                          const modelInfo = {
+                            model_id: selected.model_id,
+                            name: selected.name,
+                            provider: selected.provider,
+                            model: selected.model,
+                            base_url: selected.base_url,
+                            api_key: selected.api_key,
+                            max_tokens: selected.max_tokens,
+                            temperature: selected.temperature,
+                            api_type: selected.api_type,
+                          };
+                          localStorage.setItem('selected_infer_model', JSON.stringify(modelInfo));
+                          window.dispatchEvent(new CustomEvent('inferModelUpdated', { detail: modelInfo }));
+                        }
+                      }
+                    }
+                  }}
+                  className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-md text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                >
+                  <option value="__same_as_chat__">同对话模型</option>
+                  {models.map((model) => (
+                    <option key={model.model_id} value={model.model_id}>
+                      {model.name} ({model.provider} - {model.model})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

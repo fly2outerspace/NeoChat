@@ -53,7 +53,9 @@ class ChatCompletionRequest(BaseModel):
     stream: bool = Field(default=False, description="Whether to stream the response")
     session_id: str = Field(..., description="Session ID for conversation history (required)")
     character: Optional[CharacterInfo] = Field(None, description="Character information (optional)")
-    model_info: Optional[ModelInfo] = Field(None, description="Model configuration (optional, if not provided, uses default config from config.toml)")
+    model_info: Optional[ModelInfo] = Field(None, description="[DEPRECATED] Model configuration (optional, if not provided, uses default config from config.toml)")
+    chat_modelinfo: Optional[ModelInfo] = Field(None, description="Chat model configuration (optional, for dialogue generation)")
+    infer_modelinfo: Optional[ModelInfo] = Field(None, description="Inference model configuration (optional, for reasoning)")
     participants: Optional[List[str]] = Field(None, description="List of character IDs that messages from this request should be visible to (None means visible to all)")
 
 
@@ -329,7 +331,9 @@ class FlowCompletionRequest(BaseModel):
     session_id: str = Field(..., description="Session ID for conversation history (required)")
     flow_type: str = Field(default="chat_parallel", description="Type of flow to use (default: 'chat_parallel')")
     character: Optional[CharacterInfo] = Field(None, description="Character information (optional)")
-    model_info: Optional[ModelInfo] = Field(None, description="Model configuration (optional)")
+    model_info: Optional[ModelInfo] = Field(None, description="[DEPRECATED] Model configuration (optional)")
+    chat_modelinfo: Optional[ModelInfo] = Field(None, description="Chat model configuration (optional, for dialogue generation)")
+    infer_modelinfo: Optional[ModelInfo] = Field(None, description="Inference model configuration (optional, for reasoning)")
     participants: Optional[List[str]] = Field(None, description="List of character IDs that messages from this flow should be visible to (None means visible to all)")
 
 

@@ -50,13 +50,12 @@ class FlowService:
         
         # Create LLM instances if settings provided
         chat_llm = None
-        strategy_llm = None
+        infer_llm = None
         if llm_settings:
             chat_llm = LLM(settings=llm_settings)
-            strategy_llm = LLM(settings=llm_settings)
-            logger.info(f"Using custom LLM settings: {llm_settings.model}")
+            infer_llm = LLM(settings=llm_settings)
         else:
-            logger.info("Using default LLM config from config.toml")
+            logger.warning("Using default LLM config from config.toml")
         
         # Flow kwargs
         flow_kwargs = {
@@ -64,7 +63,7 @@ class FlowService:
             "name": name or "chat_parallel_flow",
             "roleplay_prompt": roleplay_prompt or ROLEPLAY_PROMPT,
             "chat_llm": chat_llm,
-            "strategy_llm": strategy_llm,
+            "infer_llm": infer_llm,
             "visible_for_characters": visible_for_characters,
             "character_id": character_id,
         }

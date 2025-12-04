@@ -40,14 +40,14 @@ class CharacterFlow(SequentialFlow):
     
     # LLM instances
     chat_llm: Optional[LLM] = None
-    strategy_llm: Optional[LLM] = None
+    infer_llm: Optional[LLM] = None
     
     def _initialize_llms(self):
         """Initialize default LLM instances if not provided"""
         if self.chat_llm is None:
             self.chat_llm = LLM(config_name="openai")
-        if self.strategy_llm is None:
-            self.strategy_llm = LLM(config_name="openai")
+        if self.infer_llm is None:
+            self.infer_llm = LLM(config_name="openai")
     
     def build_nodes(self) -> List[FlowNode]:
         """Build the flow nodes for CharacterFlow"""
@@ -60,7 +60,7 @@ class CharacterFlow(SequentialFlow):
                 name=self.name,
                 roleplay_prompt=self.roleplay_prompt,
                 character_id=self.character_id,
-                llm=self.strategy_llm,
+                llm=self.infer_llm,
                 memory=memory,
                 available_tools=ToolCollection(
                     Strategy(),
