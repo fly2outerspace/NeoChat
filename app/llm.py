@@ -539,7 +539,9 @@ class LLM:
             # Validate and fix message sequence before sending to API
             messages = self._validate_and_fix_messages(messages)
 
-            
+            # from pprint import pprint
+            # for msg in messages:
+            #     pprint(msg, width=210)
 
             # Log message sequence for debugging (only if there are tool messages)
             has_tool_messages = any(msg.get("role") == "tool" for msg in messages)
