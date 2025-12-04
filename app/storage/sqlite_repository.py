@@ -423,4 +423,43 @@ class SQLiteMessageRepository(SQLiteBase, MessageRepository):
             }
         
         return result
-
+    
+    def count_dialogue_messages(
+        self,
+        session_id: str,
+        speaker: str,
+        categories: Optional[List[int]] = None
+    ) -> int:
+        """Count dialogue messages by speaker and categories
+        
+        This is an efficient COUNT query for calculating dialogue turns.
+        
+        Args:
+            session_id: Session ID
+            speaker: Speaker name to filter by
+            categories: List of category filters (default: [1, 2] for TELEGRAM and SPEAK_IN_PERSON)
+            
+        Returns:
+            Count of matching messages
+        """
+        # Default to TELEGRAM(1) and SPEAK_IN_PERSON(2)
+        if categories is None:
+            categories = [1, 2]
+        
+        if not categories:
+            return 0
+        
+        # Build category filter
+        category_placeholders = ",".join("?" * len(categories))
+        
+        with self._get_cursor() as cursor:
+            cursor.execute(f"""
+                SELECT COUNT(*) as count
+                FROM messages
+                WHERE session_id = ?
+                  AND speaker = ?
+                  AND category IN ({category_placeholders})
+            """, (session_id, speaker) + tuple(categories))
+            
+            row = cursor.fetchone()
+            return row["count"] if row else 0

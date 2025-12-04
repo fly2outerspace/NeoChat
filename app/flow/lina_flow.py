@@ -186,16 +186,42 @@ class LinaFlow(SequentialFlow):
         
         # ==================== Parallel Execution ====================
         def create_parallel_flow(ctx: ExecutionContext) -> Runnable:
-            """Factory function for inner parallel flow"""
-            return _InnerParallelFlow(
+            """Factory function for inner parallel flow or just CharacterFlow
+            
+            WriterAgent is triggered every 5 dialogue turns (speaker's messages with category 1 or 2).
+            """
+            # Count dialogue messages for this character
+            dialogue_count = Memory.count_dialogue_messages(
                 session_id=ctx.session_id,
-                name=self.name,
-                roleplay_prompt=self.roleplay_prompt,
-                character_id=self.character_id,
-                chat_llm=self.chat_llm,
-                infer_llm=self.infer_llm,
-                visible_for_characters=ctx.visible_for_characters or self.visible_for_characters,
+                speaker=self.name,
             )
+            
+            # Trigger WriterAgent every 5 dialogue turns
+            should_run_writer = dialogue_count > 0 and dialogue_count % 5 == 0
+            
+            if should_run_writer:
+                logger.info(f" {self.name} dialogue count={dialogue_count}, triggering WriterAgent")
+                return _InnerParallelFlow(
+                    session_id=ctx.session_id,
+                    name=self.name,
+                    roleplay_prompt=self.roleplay_prompt,
+                    character_id=self.character_id,
+                    chat_llm=self.chat_llm,
+                    infer_llm=self.infer_llm,
+                    visible_for_characters=ctx.visible_for_characters or self.visible_for_characters,
+                )
+            else:
+                logger.info(f" {self.name} dialogue count={dialogue_count}, skipping WriterAgent")
+                # Just return CharacterFlow without WriterAgent
+                return CharacterFlow(
+                    session_id=ctx.session_id,
+                    name=self.name,
+                    roleplay_prompt=self.roleplay_prompt,
+                    character_id=self.character_id,
+                    chat_llm=self.chat_llm,
+                    infer_llm=self.infer_llm,
+                    visible_for_characters=ctx.visible_for_characters or self.visible_for_characters,
+                )
         
         def parallel_input_adapter(ctx: ExecutionContext) -> ExecutionContext:
             """Transform context for parallel execution - clear user_input to avoid duplicate storage"""
