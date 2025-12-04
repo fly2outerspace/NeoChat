@@ -183,8 +183,8 @@ class CharacterFlow(SequentialFlow):
     
     def __init__(self, **data):
         """Initialize CharacterFlow and build nodes"""
-        if "flow_id" not in data:
-            data["flow_id"] = f"flow-{uuid.uuid4().hex[:8]}"
+        if "id" not in data:
+            data["id"] = f"flow-{uuid.uuid4().hex[:8]}"
         super().__init__(**data)
         self._initialize_llms()
         self.nodes = self.build_nodes()

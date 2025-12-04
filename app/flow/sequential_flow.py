@@ -69,7 +69,7 @@ class SequentialFlow(BaseFlow):
                     type="flow_step",
                     content=f"执行节点 {step_count}: {node.name}",
                     step=step_count,
-                    flow_id=self.flow_id,
+                    flow_id=self.id,
                     node_id=node.id,
                     stage=node.name,
                 )
@@ -96,7 +96,7 @@ class SequentialFlow(BaseFlow):
         # Emit final event
         yield ExecutionEvent(
             type="final",
-            flow_id=self.flow_id,
+            flow_id=self.id,
         )
     
     def _get_starting_node_id(self) -> Optional[str]:

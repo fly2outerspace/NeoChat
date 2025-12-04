@@ -20,7 +20,6 @@ from app.memory import Memory
 from app.runnable.base import Runnable
 from app.runnable.context import ExecutionContext
 from app.schema import (
-    AgentState,
     ExecutionEvent,
     ExecutionState,
     Message,
@@ -105,26 +104,12 @@ class BaseAgent(Runnable, ABC):
         logger.info(f"initialize agent: {self.id} with session_id: {self.session_id}, LLM config: {config_name}, model: {model_name}")
         return self
 
-    @property
-    def legacy_state(self) -> AgentState:
-        """Get the legacy AgentState (for backward compatibility)"""
-        state_mapping = {
-            ExecutionState.IDLE: AgentState.IDLE,
-            ExecutionState.RUNNING: AgentState.RUNNING,
-            ExecutionState.FINISHED: AgentState.FINISHED,
-            ExecutionState.ERROR: AgentState.ERROR,
-            ExecutionState.PAUSED: AgentState.IDLE,
-        }
-        return state_mapping.get(self.state, AgentState.IDLE)
-
     @asynccontextmanager
-    async def state_context(self, new_state: Union[AgentState, ExecutionState]):
+    async def state_context(self, new_state: ExecutionState):
         """Context manager for safe agent state transitions.
 
-        Supports both AgentState (legacy) and ExecutionState (new).
-
         Args:
-            new_state: The state to transition to during the context.
+            new_state: The ExecutionState to transition to during the context.
 
         Yields:
             None: Allows execution within the new state.
@@ -132,16 +117,6 @@ class BaseAgent(Runnable, ABC):
         Raises:
             ValueError: If the new_state is invalid.
         """
-        # Convert AgentState to ExecutionState if needed
-        if isinstance(new_state, AgentState):
-            state_mapping = {
-                AgentState.IDLE: ExecutionState.IDLE,
-                AgentState.RUNNING: ExecutionState.RUNNING,
-                AgentState.FINISHED: ExecutionState.FINISHED,
-                AgentState.ERROR: ExecutionState.ERROR,
-            }
-            new_state = state_mapping.get(new_state, ExecutionState.IDLE)
-        
         if not isinstance(new_state, ExecutionState):
             raise ValueError(f"Invalid state: {new_state}")
 

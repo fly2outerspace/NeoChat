@@ -73,7 +73,7 @@ class BaseFlow(Runnable):
     3. Be nested within other Flows
     
     Attributes:
-        flow_id: Unique flow instance ID
+        id: Unique flow instance ID (inherited from Runnable)
         session_id: Session ID for this flow instance
         name: Flow name
         nodes: List of flow nodes to execute
@@ -102,27 +102,6 @@ class BaseFlow(Runnable):
     class Config:
         arbitrary_types_allowed = True
         underscore_attrs_are_private = True
-    
-    def __init__(self, **data):
-        """Initialize BaseFlow
-        
-        Note: flow_id cannot be set directly. Use id instead.
-        flow_id is automatically mapped to id via property.
-        """
-        # Remove flow_id if provided (not allowed to set directly)
-        if "flow_id" in data:
-            data.pop("flow_id")
-        super().__init__(**data)
-    
-    @property
-    def flow_id(self) -> str:
-        """flow_id is an alias for id (for backward compatibility)"""
-        return self.id
-    
-    @flow_id.setter
-    def flow_id(self, value: str) -> None:
-        """Setting flow_id also sets id"""
-        object.__setattr__(self, 'id', value)
     
     def on_event(self, event: ExecutionEvent) -> None:
         """Hook for handling flow events. Override for custom handling."""
@@ -164,7 +143,7 @@ class BaseFlow(Runnable):
                 
                 # Add flow info to event
                 event_with_flow = event.with_flow_info(
-                    flow_id=self.flow_id,
+                    flow_id=self.id,
                     node_id=node.id,
                     stage=node.name
                 )
@@ -183,7 +162,7 @@ class BaseFlow(Runnable):
             yield ExecutionEvent(
                 type="error",
                 content=f"Node {node.name} failed: {str(e)}",
-                flow_id=self.flow_id,
+                flow_id=self.id,
                 node_id=node.id,
                 stage=node.name,
             )

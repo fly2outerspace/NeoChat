@@ -16,56 +16,13 @@ from app.utils.enums import MessageCategory
 # Execution States
 # =============================================================================
 
-class AgentState(str, Enum):
-    """Agent execution states (legacy, use ExecutionState for new code)"""
-    IDLE = "IDLE"
-    RUNNING = "RUNNING"
-    FINISHED = "FINISHED"
-    ERROR = "ERROR"
-
-
-class FlowState(str, Enum):
-    """Flow execution states (legacy, use ExecutionState for new code)"""
-    IDLE = "IDLE"
-    RUNNING = "RUNNING"
-    PAUSED = "PAUSED"
-    FINISHED = "FINISHED"
-    ERROR = "ERROR"
-
-
 class ExecutionState(str, Enum):
-    """Unified execution state for all Runnables
-    
-    This is the recommended state enum for new code.
-    """
+    """Unified execution state for all Runnables (Agents and Flows)"""
     IDLE = "idle"
     RUNNING = "running"
     PAUSED = "paused"
     FINISHED = "finished"
     ERROR = "error"
-    
-    @classmethod
-    def from_agent_state(cls, state: AgentState) -> "ExecutionState":
-        """Convert from AgentState for compatibility"""
-        mapping = {
-            AgentState.IDLE: cls.IDLE,
-            AgentState.RUNNING: cls.RUNNING,
-            AgentState.FINISHED: cls.FINISHED,
-            AgentState.ERROR: cls.ERROR,
-        }
-        return mapping.get(state, cls.IDLE)
-    
-    @classmethod
-    def from_flow_state(cls, state: FlowState) -> "ExecutionState":
-        """Convert from FlowState for compatibility"""
-        mapping = {
-            FlowState.IDLE: cls.IDLE,
-            FlowState.RUNNING: cls.RUNNING,
-            FlowState.PAUSED: cls.PAUSED,
-            FlowState.FINISHED: cls.FINISHED,
-            FlowState.ERROR: cls.ERROR,
-        }
-        return mapping.get(state, cls.IDLE)
 
 
 class ControlSignal(str, Enum):
@@ -280,9 +237,6 @@ class Relation(BaseModel):
 class ExecutionEvent(BaseModel):
     """Unified streaming event for all Runnables (Agents and Flows)
     
-    This is the single event type used throughout the system.
-    It replaces the previous AgentStreamEvent and FlowEvent.
-    
     Event Types:
     - token: Content token (streaming text)
     - tool_status: Tool execution status update
@@ -445,12 +399,3 @@ class ExecutionEvent(BaseModel):
     def flow_step_event(cls, content: str, flow_id: str, node_id: Optional[str] = None, stage: Optional[str] = None, **kwargs) -> "ExecutionEvent":
         """Create a flow_step event"""
         return cls(type="flow_step", content=content, flow_id=flow_id, node_id=node_id, stage=stage, **kwargs)
-
-
-# =============================================================================
-# Type Aliases for Backward Compatibility
-# =============================================================================
-
-# These aliases allow existing code to continue working without changes
-AgentStreamEvent = ExecutionEvent
-FlowEvent = ExecutionEvent

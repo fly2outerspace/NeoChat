@@ -117,7 +117,7 @@ class ParallelFlow(BaseFlow):
             yield ExecutionEvent(
                 type="flow_step",
                 content=f"开始并行执行 {len(response_nodes)} 个响应节点",
-                flow_id=self.flow_id,
+                flow_id=self.id,
             )
             
             # Process events until all response nodes complete
@@ -150,13 +150,13 @@ class ParallelFlow(BaseFlow):
                 yield ExecutionEvent(
                     type="error",
                     content=f"Parallel flow error: {e}",
-                    flow_id=self.flow_id,
+                    flow_id=self.id,
                 )
         
         # Emit final event
         yield ExecutionEvent(
             type="final",
-            flow_id=self.flow_id,
+            flow_id=self.id,
             metadata={
                 "background_tasks": len(self._background_tasks),
                 "running": sum(1 for t in self._background_tasks if not t.done()),
@@ -196,7 +196,7 @@ class ParallelFlow(BaseFlow):
             await self._event_queue.put(ExecutionEvent(
                 type="error",
                 content=f"Node {node.name} failed: {e}",
-                flow_id=self.flow_id,
+                flow_id=self.id,
                 node_id=node.id,
             ))
             await self._event_queue.put({

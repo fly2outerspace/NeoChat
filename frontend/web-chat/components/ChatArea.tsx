@@ -8,6 +8,7 @@ import { useLocalStorageInput } from '@/lib/useLocalStorageInput';
 import { getChatTheme, type ChatTheme } from '@/lib/themes';
 import { listCharacters, type Character } from '@/lib/api/character';
 import { fetchSessionTime } from '@/lib/api/sessionTime';
+import { parseSSEEvent, isTokenEvent, isStatusEvent, isDoneEvent, isErrorEvent, hasToolInfo, type SSEEvent } from '@/lib/sse';
 
 const INLINE_TOOL_NAMES = new Set(['send_telegram_message', 'speak_in_person']);
 const TOOL_NAME_LABELS: Record<string, string> = {
@@ -976,87 +977,84 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
             return true;
           }
 
-          try {
-            const chunk = JSON.parse(payload);
-            const choice = chunk?.choices?.[0];
-            const delta = choice?.delta;
-            const toolEvent = delta?.tool_event;
-            const toolName = typeof toolEvent?.message_type === 'string' ? toolEvent.message_type : null;
-            
-            // Handle tool_status updates
-            const toolStatusUpdate = delta?.tool_status;
-            if (typeof toolStatusUpdate === 'string') {
-              setToolStatus(toolStatusUpdate);
-              // Keep waiting animation visible when tool_status is present
-              setIsWaitingResponse(true);
-            }
-            
-            // Handle content updates (tokens)
-            const deltaContent = delta?.content;
-            if (typeof deltaContent === 'string') {
-              // Get message_id from tool_event if available (for both tool outputs and text messages)
-              const messageId = toolEvent?.message_id;
-              ensureAssistantPlaceholder(messageId);
-              
-              const isExternalToolOutput =
-                toolEvent?.type === 'tool_output' &&
-                toolName &&
-                !INLINE_TOOL_NAMES.has(toolName.toLowerCase());
+          const event = parseSSEEvent(payload);
+          if (!event) {
+            return false;
+          }
 
-              if (isExternalToolOutput && toolName) {
-                hasExternalToolOutput = true;
-                appendToolOutput(toolName, toolEvent?.message_id, deltaContent);
-                if (showLiveUpdates && placeholderIndexRef.current !== null) {
-                  const shouldSaveOutputs = shouldPersistNow();
-                  updateAssistantToolOutputs(
-                    toolOutputsRef.current[placeholderIndexRef.current] || [],
-                    currentSessionId,
-                    shouldSaveOutputs
-                  );
-                }
-              } else {
-                // This is inline tool output (send_telegram_message or speak_in_person)
-                // Track the tool name for the first chunk
-                if (!currentInlineToolName && toolName) {
-                  currentInlineToolName = toolName;
-                }
-                // Update message_id if available
-                if (messageId) {
-                  currentTextMessageId = messageId;
-                }
-                finalContentBuffer += deltaContent;
-                if (showLiveUpdates) {
-                  streamedContent += deltaContent;
-                  const shouldSaveContent = shouldPersistNow();
-                  // Update placeholder with message_id
-                  setMessages((prev) => {
-                    if (placeholderIndexRef.current === null || placeholderIndexRef.current >= prev.length) {
-                      return prev;
-                    }
-                    const updated = [...prev];
-                    updated[placeholderIndexRef.current] = {
-                      ...updated[placeholderIndexRef.current],
-                      content: streamedContent,
-                      toolName: currentInlineToolName,
-                      clientMessageId: currentTextMessageId,
-                    };
-                    if (shouldSaveContent && currentSessionId) {
-                      saveSessionMessages(currentSessionId, updated);
-                    }
-                    return updated;
-                  });
-                }
+          // Handle status events
+          if (isStatusEvent(event)) {
+            setToolStatus(event.status);
+            setIsWaitingResponse(true);
+            return false;
+          }
+          
+          // Handle done event
+          if (isDoneEvent(event)) {
+            setIsWaitingResponse(false);
+            return true;
+          }
+          
+          // Handle error event
+          if (isErrorEvent(event)) {
+            console.error('SSE error:', event.content);
+            setToolStatus(`❌ ${event.content}`);
+            return false;
+          }
+          
+          // Handle token events (content)
+          if (isTokenEvent(event)) {
+            const toolName = hasToolInfo(event) ? event.tool.name : null;
+            const messageId = hasToolInfo(event) ? event.tool.id : undefined;
+            
+            ensureAssistantPlaceholder(messageId);
+            
+            // Check if this is external tool output (not inline)
+            const isExternalToolOutput = toolName && !INLINE_TOOL_NAMES.has(toolName.toLowerCase());
+
+            if (isExternalToolOutput && toolName) {
+              hasExternalToolOutput = true;
+              appendToolOutput(toolName, messageId, event.content);
+              if (showLiveUpdates && placeholderIndexRef.current !== null) {
+                const shouldSaveOutputs = shouldPersistNow();
+                updateAssistantToolOutputs(
+                  toolOutputsRef.current[placeholderIndexRef.current] || [],
+                  currentSessionId,
+                  shouldSaveOutputs
+                );
+              }
+            } else {
+              // Inline tool output or regular text
+              if (!currentInlineToolName && toolName) {
+                currentInlineToolName = toolName;
+              }
+              if (messageId) {
+                currentTextMessageId = messageId;
+              }
+              finalContentBuffer += event.content;
+              if (showLiveUpdates) {
+                streamedContent += event.content;
+                const shouldSaveContent = shouldPersistNow();
+                setMessages((prev) => {
+                  if (placeholderIndexRef.current === null || placeholderIndexRef.current >= prev.length) {
+                    return prev;
+                  }
+                  const updated = [...prev];
+                  updated[placeholderIndexRef.current] = {
+                    ...updated[placeholderIndexRef.current],
+                    content: streamedContent,
+                    toolName: currentInlineToolName,
+                    clientMessageId: currentTextMessageId,
+                  };
+                  if (shouldSaveContent && currentSessionId) {
+                    saveSessionMessages(currentSessionId, updated);
+                  }
+                  return updated;
+                });
               }
             }
-            
-            if (choice?.finish_reason) {
-              // Hide waiting animation when finished
-              setIsWaitingResponse(false);
-              return true;
-            }
-          } catch (parseError) {
-            console.error('Failed to parse streaming chunk', parseError);
           }
+          
           return false;
         };
 

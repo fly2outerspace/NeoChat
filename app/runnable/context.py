@@ -26,10 +26,6 @@ class ExecutionContext(BaseModel):
         default=None,
         description="User input text"
     )
-    input_mode: Optional[str] = Field(
-        default=None,
-        description="Input mode (e.g., 'phone', 'in_person')"
-    )
     
     # Shared data store (readable/writable by all nodes)
     data: Dict[str, Any] = Field(
@@ -128,8 +124,6 @@ class ExecutionContext(BaseModel):
             "user_input": self.user_input,
             **self.data,
         }
-        if self.input_mode:
-            result["input_mode"] = self.input_mode
         if self.character_id:
             result["character_id"] = self.character_id
         if self.visible_for_characters:
@@ -149,15 +143,13 @@ class ExecutionContext(BaseModel):
         # Extract known fields
         session_id = data.pop("session_id", "")
         user_input = data.pop("user_input", None)
-        input_mode = data.pop("input_mode", None)
         character_id = data.pop("character_id", None)
         visible_for_characters = data.pop("visible_for_characters", None)
         
-        # Remaining fields go into data
+        # Remaining fields (including input_mode) go into data
         return cls(
             session_id=session_id,
             user_input=user_input,
-            input_mode=input_mode,
             character_id=character_id,
             visible_for_characters=visible_for_characters,
             data=data,

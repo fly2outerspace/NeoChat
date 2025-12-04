@@ -14,6 +14,8 @@ from app.api.schemas import (
     ChatMessage,
     ToolOutputMessage,
     FlowCompletionRequest,
+    SSEEvent,
+    SSEToolInfo,
 )
 from app.api.services.agent_service import AgentService
 from app.api.services.flow_service import FlowService
@@ -32,11 +34,8 @@ INLINE_TOOL_NAMES = {ToolName.SEND_TELEGRAM_MESSAGE, ToolName.SPEAK_IN_PERSON}
 
 def _get_model_name(request) -> str:
     """Get model name from request or default config"""
-    # Priority: chat_modelinfo > model_info (deprecated) > default config
     if hasattr(request, 'chat_modelinfo') and request.chat_modelinfo:
         return request.chat_modelinfo.model
-    if hasattr(request, 'model_info') and request.model_info:
-        return request.model_info.model
     
     from app.config import config
     default_config = config.llm.get("openai") or config.llm.get("default")
@@ -48,27 +47,20 @@ def _get_model_name(request) -> str:
 async def generate_streaming_response(
     runnable,
     user_input: str,
-    response_id: str,
-    model: str,
     input_mode: Optional[InputMode] = None,
 ) -> AsyncIterator[str]:
     """Generate streaming SSE response from any Runnable (Agent or Flow).
     
-    This unified function handles both Agents and Flows since they now
-    emit the same ExecutionEvent type.
+    Uses simplified SSEEvent format instead of verbose OpenAI format.
     
     Args:
         runnable: Agent or Flow instance
         user_input: User input text
-        response_id: Response ID for SSE chunks
-        model: Model name for response
         input_mode: Optional input mode
         
     Yields:
         SSE formatted strings
     """
-    created = int(time.time())
-    
     try:
         logger.info(f"Running {runnable.name} with streaming events...")
         kwargs = {}
@@ -76,158 +68,126 @@ async def generate_streaming_response(
             kwargs["input_mode"] = input_mode
         
         async for event in runnable.run_stream(user_input, **kwargs):
-            chunk = None
+            sse_event = None
             
             if event.type == "token":
                 if event.content:
                     cleaned_content = remove_empty_lines(event.content)
                     if not cleaned_content:
                         continue
-                    delta_payload = {"content": cleaned_content}
-                    if event.message_type:
-                        delta_payload["tool_event"] = {
-                            "type": "tool_output",
-                            "message_type": event.message_type,
-                            "message_id": event.message_id,
-                        }
-                    if event.stage:
-                        delta_payload["flow_stage"] = event.stage
-                    if event.node_id:
-                        delta_payload["node_id"] = event.node_id
-                    chunk = {
-                        "id": response_id,
-                        "object": "chat.completion.chunk",
-                        "created": created,
-                        "model": model,
-                        "choices": [{
-                            "index": 0,
-                            "delta": delta_payload,
-                            "finish_reason": None
-                        }]
-                    }
+                    # Build tool info if present
+                    tool_info = None
+                    if event.message_type and event.message_id:
+                        tool_info = SSEToolInfo(name=event.message_type, id=event.message_id)
+                    sse_event = SSEEvent.create_token(
+                        content=cleaned_content,
+                        tool=tool_info,
+                        stage=event.stage,
+                        node_id=event.node_id,
+                    )
             
             elif event.type == "tool_status":
-                chunk = {
-                    "id": response_id,
-                    "object": "chat.completion.chunk",
-                    "created": created,
-                    "model": model,
-                    "choices": [{
-                        "index": 0,
-                        "delta": {
-                            "tool_status": event.content or "",
-                            "flow_stage": event.stage or "",
-                        },
-                        "finish_reason": None
-                    }]
-                }
+                sse_event = SSEEvent.create_status(
+                    status=event.content or "",
+                    stage=event.stage,
+                    node_id=event.node_id,
+                )
             
             elif event.type == "tool_output":
                 if event.content:
                     cleaned_content = remove_empty_lines(event.content)
                     if not cleaned_content:
                         continue
-                    chunk = {
-                        "id": response_id,
-                        "object": "chat.completion.chunk",
-                        "created": created,
-                        "model": model,
-                        "choices": [{
-                            "index": 0,
-                            "delta": {
-                                "content": event.content,
-                                "tool_event": {
-                                    "type": "tool_output",
-                                    "message_type": event.message_type,
-                                    "message_id": event.message_id,
-                                },
-                                "flow_stage": event.stage or "",
-                            },
-                            "finish_reason": None
-                        }]
-                    }
+                    tool_info = None
+                    if event.message_type and event.message_id:
+                        tool_info = SSEToolInfo(name=event.message_type, id=event.message_id)
+                    sse_event = SSEEvent.create_token(
+                        content=cleaned_content,
+                        tool=tool_info,
+                        stage=event.stage,
+                        node_id=event.node_id,
+                    )
             
             elif event.type in ("step", "flow_step"):
-                chunk = {
-                    "id": response_id,
-                    "object": "chat.completion.chunk",
-                    "created": created,
-                    "model": model,
-                    "choices": [{
-                        "index": 0,
-                        "delta": {
-                            "tool_status": event.content or "",
-                            "flow_stage": event.stage or "",
-                        },
-                        "finish_reason": None
-                    }]
-                }
+                sse_event = SSEEvent.create_status(
+                    status=event.content or "",
+                    stage=event.stage,
+                    node_id=event.node_id,
+                )
             
             elif event.type == "final":
                 if event.content:
                     cleaned_content = remove_empty_lines(event.content)
                     if cleaned_content:
-                        chunk = {
-                            "id": response_id,
-                            "object": "chat.completion.chunk",
-                            "created": created,
-                            "model": model,
-                            "choices": [{
-                                "index": 0,
-                                "delta": {"content": cleaned_content},
-                                "finish_reason": None
-                            }]
-                        }
-                        yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
-                
-                # Send finish chunk
-                finish_chunk = {
-                    "id": response_id,
-                    "object": "chat.completion.chunk",
-                    "created": created,
-                    "model": model,
-                    "choices": [{
-                        "index": 0,
-                        "delta": {},
-                        "finish_reason": "stop"
-                    }]
-                }
-                yield f"data: {json.dumps(finish_chunk, ensure_ascii=False)}\n\n"
+                        yield SSEEvent.create_token(content=cleaned_content).to_sse()
+                yield SSEEvent.create_done().to_sse()
                 yield "data: [DONE]\n\n"
                 return
             
             elif event.type == "error":
-                chunk = {
-                    "id": response_id,
-                    "object": "chat.completion.chunk",
-                    "created": created,
-                    "model": model,
-                    "choices": [{
-                        "index": 0,
-                        "delta": {
-                            "tool_status": event.content or "",
-                            "flow_stage": event.stage or "",
-                        },
-                        "finish_reason": None
-                    }]
-                }
+                sse_event = SSEEvent.create_error(
+                    content=event.content or "Unknown error",
+                    stage=event.stage,
+                )
             
-            if chunk:
-                yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+            if sse_event:
+                yield sse_event.to_sse()
         
-        # If we didn't get a final event, send finish chunk
-        finish_chunk = {
+        # If we didn't get a final event, send done
+        yield SSEEvent.create_done().to_sse()
+        yield "data: [DONE]\n\n"
+        
+    except Exception as e:
+        logger.error("Error in streaming response: %s", e, exc_info=True)
+        yield SSEEvent.create_error(content=str(e)).to_sse()
+        yield "data: [DONE]\n\n"
+
+
+# Legacy OpenAI format support (kept for reference, can be removed if not needed)
+async def _generate_openai_streaming_response(
+    runnable,
+    user_input: str,
+    response_id: str,
+    model: str,
+    input_mode: Optional[InputMode] = None,
+) -> AsyncIterator[str]:
+    """Generate streaming SSE response in OpenAI format (legacy).
+    
+    This function is kept for backward compatibility with OpenAI clients.
+    New code should use generate_streaming_response() with SSEEvent format.
+    """
+    created = int(time.time())
+    
+    def make_chunk(delta: dict, finish_reason: Optional[str] = None) -> str:
+        chunk = {
             "id": response_id,
             "object": "chat.completion.chunk",
             "created": created,
             "model": model,
-            "choices": [{
-                "index": 0,
-                "delta": {},
-                "finish_reason": "stop"
-            }]
+            "choices": [{"index": 0, "delta": delta, "finish_reason": finish_reason}]
         }
-        yield f"data: {json.dumps(finish_chunk, ensure_ascii=False)}\n\n"
+        return f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+    
+    try:
+        kwargs = {}
+        if input_mode:
+            kwargs["input_mode"] = input_mode
+        
+        async for event in runnable.run_stream(user_input, **kwargs):
+            if event.type == "token" and event.content:
+                cleaned = remove_empty_lines(event.content)
+                if cleaned:
+                    yield make_chunk({"content": cleaned})
+            elif event.type == "final":
+                if event.content:
+                    cleaned = remove_empty_lines(event.content)
+                    if cleaned:
+                        yield make_chunk({"content": cleaned})
+                yield make_chunk({}, "stop")
+                yield "data: [DONE]\n\n"
+                return
+        
+        yield make_chunk({}, "stop")
         yield "data: [DONE]\n\n"
         
     except Exception as e:
@@ -343,8 +303,7 @@ async def chat_completions(request: ChatCompletionRequest) -> Union[Dict[str, An
             character_id = request.character.character_id
             _upsert_character(character_id, character_name, roleplay_prompt)
         
-        # Extract LLM settings
-        # Priority: chat_modelinfo > model_info (deprecated) > default config
+        # Extract LLM settings from chat_modelinfo (optional, falls back to default config)
         llm_settings = None
         if request.chat_modelinfo:
             llm_settings = LLMSettings(
@@ -354,15 +313,6 @@ async def chat_completions(request: ChatCompletionRequest) -> Union[Dict[str, An
                 max_tokens=request.chat_modelinfo.max_tokens,
                 temperature=request.chat_modelinfo.temperature,
                 api_type=request.chat_modelinfo.api_type,
-            )
-        elif request.model_info:
-            llm_settings = LLMSettings(
-                model=request.model_info.model,
-                base_url=request.model_info.base_url,
-                api_key=request.model_info.api_key or "",
-                max_tokens=request.model_info.max_tokens,
-                temperature=request.model_info.temperature,
-                api_type=request.model_info.api_type,
             )
         
         # Validate input
@@ -389,15 +339,10 @@ async def chat_completions(request: ChatCompletionRequest) -> Union[Dict[str, An
         
         # Handle streaming
         if request.stream:
-            response_id = f"chatcmpl-{uuid.uuid4().hex[:8]}"
-            model = _get_model_name(request)
-            
             return StreamingResponse(
                 generate_streaming_response(
                     runnable=agent,
                     user_input=user_input,
-                    response_id=response_id,
-                    model=model,
                     input_mode=input_mode,
                 ),
                 media_type="text/event-stream",
@@ -448,7 +393,6 @@ async def flow_completions(request: FlowCompletionRequest) -> Union[Dict[str, An
         session_id = request.session_id
         
         # Extract LLM settings for chat and inference models
-        # Priority: chat_modelinfo/infer_modelinfo > model_info (deprecated) > default config
         chat_llm_settings = None
         infer_llm_settings = None
         
@@ -461,15 +405,6 @@ async def flow_completions(request: FlowCompletionRequest) -> Union[Dict[str, An
                 temperature=request.chat_modelinfo.temperature,
                 api_type=request.chat_modelinfo.api_type,
             )
-        elif request.model_info:
-            chat_llm_settings = LLMSettings(
-                model=request.model_info.model,
-                base_url=request.model_info.base_url,
-                api_key=request.model_info.api_key or "",
-                max_tokens=request.model_info.max_tokens,
-                temperature=request.model_info.temperature,
-                api_type=request.model_info.api_type,
-            )
         
         if request.infer_modelinfo:
             infer_llm_settings = LLMSettings(
@@ -479,16 +414,6 @@ async def flow_completions(request: FlowCompletionRequest) -> Union[Dict[str, An
                 max_tokens=request.infer_modelinfo.max_tokens,
                 temperature=request.infer_modelinfo.temperature,
                 api_type=request.infer_modelinfo.api_type,
-            )
-        elif request.model_info:
-            # Use same model for inference if only model_info is provided
-            infer_llm_settings = LLMSettings(
-                model=request.model_info.model,
-                base_url=request.model_info.base_url,
-                api_key=request.model_info.api_key or "",
-                max_tokens=request.model_info.max_tokens,
-                temperature=request.model_info.temperature,
-                api_type=request.model_info.api_type,
             )
         elif chat_llm_settings:
             # Use chat model for inference if only chat_modelinfo is provided
@@ -534,15 +459,10 @@ async def flow_completions(request: FlowCompletionRequest) -> Union[Dict[str, An
         
         # Handle streaming
         if request.stream:
-            response_id = f"flowcmpl-{uuid.uuid4().hex[:8]}"
-            model = _get_model_name(request)
-            
             return StreamingResponse(
                 generate_streaming_response(
                     runnable=flow,
                     user_input=user_input,
-                    response_id=response_id,
-                    model=model,
                     input_mode=input_mode,
                 ),
                 media_type="text/event-stream",

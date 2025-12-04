@@ -7,7 +7,7 @@ from pydantic import Field
 from app.agent.react import ReActAgent
 from app.logger import logger
 from app.prompt.toolcall import NEXT_STEP_PROMPT, SYSTEM_PROMPT
-from app.schema import AgentState, ExecutionEvent, ExecutionState, Message, ToolCall
+from app.schema import ExecutionEvent, ExecutionState, Message, ToolCall
 from app.tool import CreateChatCompletion, Terminate, ToolCollection, ToolResult
 from app.utils.enums import ToolName
 from app.utils import get_current_time

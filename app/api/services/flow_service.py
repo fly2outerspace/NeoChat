@@ -16,7 +16,6 @@ class FlowService:
     def create_flow(
         flow_type: str = "chat_parallel",
         session_id: str = "",
-        flow_id: Optional[str] = None,
         name: Optional[str] = None,
         roleplay_prompt: Optional[str] = None,
         llm_settings: Optional[LLMSettings] = None,
@@ -29,7 +28,6 @@ class FlowService:
         Args:
             flow_type: Type of flow to create (only "chat_parallel" is supported)
             session_id: Session ID (required)
-            flow_id: Optional flow ID (auto-generated if not provided)
             name: Character/flow name
             roleplay_prompt: Roleplay prompt
             llm_settings: Optional LLM settings
@@ -67,8 +65,6 @@ class FlowService:
             "visible_for_characters": visible_for_characters,
             "character_id": character_id,
         }
-        if flow_id:
-            flow_kwargs["flow_id"] = flow_id
         flow_kwargs.update(kwargs)
         
         return ChatParallelFlow(**flow_kwargs)
