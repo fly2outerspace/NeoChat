@@ -7,8 +7,9 @@ unified Runnable abstraction.
 Available Flows:
 - SequentialFlow: Executes nodes one by one with conditional routing
 - ParallelFlow: Executes nodes concurrently with background task support
-- CharacterFlow: Pre-configured flow for character-based chat
-- ChatParallelFlow: Parallel flow with StrategyAgent in background and CharacterFlow in response
+- CharacterFlow: Pre-configured flow for character-based chat (StrategyAgent → Speak/Telegram)
+- SeraFlow: Simple sequential flow (UserAgent → Character)
+- LinaFlow: Full featured flow (UserAgent → Parallel(WriterAgent + CharacterFlow))
 
 Flow Types:
 - BaseFlow: Abstract base class for all flows (extends Runnable)
@@ -19,7 +20,8 @@ from app.flow.base import BaseFlow, FlowNode
 from app.flow.sequential_flow import SequentialFlow
 from app.flow.parallel_flow import ParallelFlow
 from app.flow.character_flow import CharacterFlow
-from app.flow.chat_parallel_flow import ChatParallelFlow
+from app.flow.sera_flow import SeraFlow
+from app.flow.lina_flow import LinaFlow
 
 __all__ = [
     # Base classes
@@ -29,5 +31,6 @@ __all__ = [
     "SequentialFlow",
     "ParallelFlow",
     "CharacterFlow",
-    "ChatParallelFlow",
+    "SeraFlow",
+    "LinaFlow",
 ]

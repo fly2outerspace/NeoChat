@@ -1,5 +1,4 @@
 """Chat API routes - Unified streaming for Agents and Flows"""
-import json
 import time
 import uuid
 from typing import Dict, Any, AsyncIterator, Union, List, Optional
@@ -17,8 +16,6 @@ from app.api.schemas import (
     SSEEvent,
     SSEToolInfo,
 )
-from app.api.services.agent_service import AgentService
-from app.api.services.flow_service import FlowService
 from app.config import LLMSettings
 from app.logger import logger
 from app.prompt.character import ROLEPLAY_PROMPT
@@ -201,7 +198,7 @@ def _upsert_character(character_id: str, character_name: str, roleplay_prompt: s
 
 @router.post("/chat/completions", response_model=None)
 async def chat_completions(request: ChatCompletionRequest) -> Union[Dict[str, Any], StreamingResponse]:
-    """OpenAI-compatible chat completions endpoint using Agent"""
+    """Chat completions endpoint using SeraFlow (UserAgent → Character)"""
     try:
         if not request.session_id:
             raise HTTPException(status_code=400, detail="session_id is required")
@@ -239,23 +236,28 @@ async def chat_completions(request: ChatCompletionRequest) -> Union[Dict[str, An
         input_mode = request.input_mode
         participants = request.participants if hasattr(request, 'participants') else None
         
-        # Create agent
-        agent = AgentService.create_agent(
+        # Create SeraFlow (UserAgent → Character)
+        from app.flow.sera_flow import SeraFlow
+        from app.llm import LLM
+        
+        llm = LLM(settings=llm_settings) if llm_settings else None
+        
+        flow = SeraFlow(
             session_id=session_id,
             name=character_name,
             roleplay_prompt=roleplay_prompt,
             character_id=character_id,
-            llm_settings=llm_settings,
+            llm=llm,
             visible_for_characters=participants,
         )
         
-        logger.info(f"Processing chat request for session {session_id}: {user_input[:50]}...")
+        logger.info(f"Processing chat request via SeraFlow for session {session_id}: {user_input[:50]}...")
         
         # Handle streaming
         if request.stream:
             return StreamingResponse(
                 generate_streaming_response(
-                    runnable=agent,
+                    runnable=flow,
                     user_input=user_input,
                     input_mode=input_mode,
                 ),
@@ -268,7 +270,7 @@ async def chat_completions(request: ChatCompletionRequest) -> Union[Dict[str, An
             )
         
         # Non-streaming
-        response_content, tool_outputs = await gather_response(agent, user_input, input_mode)
+        response_content, tool_outputs = await gather_response(flow, user_input, input_mode)
         
         response = ChatCompletionResponse(
             id=f"chatcmpl-{uuid.uuid4().hex[:8]}",
@@ -300,11 +302,22 @@ async def chat_completions(request: ChatCompletionRequest) -> Union[Dict[str, An
 
 @router.post("/flow/completions", response_model=None)
 async def flow_completions(request: FlowCompletionRequest) -> Union[Dict[str, Any], StreamingResponse]:
-    """Flow-based chat completions endpoint"""
+    """Flow-based chat completions endpoint using LinaFlow (UserAgent → Parallel(WriterAgent + CharacterFlow))"""
     try:
         if not request.session_id:
             raise HTTPException(status_code=400, detail="session_id is required")
         session_id = request.session_id
+        
+        # Extract character info
+        character_name = "lina"
+        roleplay_prompt = ROLEPLAY_PROMPT
+        character_id = None
+        if request.character:
+            character_name = request.character.name
+            roleplay_prompt = request.character.roleplay_prompt or ROLEPLAY_PROMPT
+            character_id = request.character.character_id
+            if character_id:
+                _upsert_character(character_id, character_name, roleplay_prompt)
         
         # Extract LLM settings for chat and inference models
         chat_llm_settings = None
@@ -333,43 +346,34 @@ async def flow_completions(request: FlowCompletionRequest) -> Union[Dict[str, An
             # Use chat model for inference if only chat_modelinfo is provided
             infer_llm_settings = chat_llm_settings
         
-        # Extract character info
-        character_name = "character_flow"
-        roleplay_prompt = None
-        character_id = None
-        if request.character:
-            character_name = request.character.name
-            roleplay_prompt = request.character.roleplay_prompt
-            character_id = request.character.character_id
-            if character_id:
-                _upsert_character(character_id, character_name, roleplay_prompt or "")
-        
         # Validate input
         if not request.user_input or not request.user_input.strip():
             raise HTTPException(status_code=400, detail="user_input is required")
+        if not request.input_mode:
+            raise HTTPException(status_code=400, detail="input_mode is required")
         
         user_input = request.user_input.strip()
-        input_mode = request.input_mode or InputMode.PHONE
+        input_mode = request.input_mode
         participants = request.participants if hasattr(request, 'participants') else None
         
-        # Create flow with chat and inference LLM settings
+        # Create LinaFlow (UserAgent → Parallel(WriterAgent + CharacterFlow))
+        from app.flow.lina_flow import LinaFlow
         from app.llm import LLM
+        
         chat_llm = LLM(settings=chat_llm_settings) if chat_llm_settings else None
         infer_llm = LLM(settings=infer_llm_settings) if infer_llm_settings else None
         
-        flow = FlowService.create_flow(
-            flow_type=request.flow_type,
+        flow = LinaFlow(
             session_id=session_id,
             name=character_name,
             roleplay_prompt=roleplay_prompt,
-            llm_settings=None,  # Don't use single llm_settings, use chat_llm and infer_llm instead
-            visible_for_characters=participants,
             character_id=character_id,
             chat_llm=chat_llm,
             infer_llm=infer_llm,
+            visible_for_characters=participants,
         )
         
-        logger.info(f"Processing flow request for session {session_id}: {user_input[:50]}...")
+        logger.info(f"Processing flow request via LinaFlow for session {session_id}: {user_input[:50]}...")
         
         # Handle streaming
         if request.stream:

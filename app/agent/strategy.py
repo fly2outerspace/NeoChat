@@ -107,21 +107,7 @@ class StrategyAgent(ToolCallAgent):
         return messages
 
     def handle_user_input(self, context: ExecutionContext):
-        """Handle user input from ExecutionContext"""
-        request = context.user_input
-        
-        current_time = get_current_time(session_id=self.session_id) if self.session_id else get_current_time()
-        self.history_messages, _ = Memory.get_messages_around_time(self.session_id, time_point=current_time, hours=24.0, max_messages=150, character_id=self.character_id)
-
-        if "input_mode" not in context.data:
-            logger.warning(f" {self.name} input_mode not found in context.data, using default input_mode: {InputMode.PHONE}")
-            input_mode = InputMode.PHONE
-        else:
-            input_mode = context.data.get("input_mode")
-        if input_mode != InputMode.SKIP and request:
-            category = get_category_from_input_mode(input_mode)
-            user_msg = Message.user_message(request, speaker="user", created_at=current_time, category=category, visible_for_characters=self.visible_for_characters)
-            self.memory.add_message(user_msg)
+        pass
 
     def prepare_system_messages(self) -> list[Message]:
         """Prepare system messages for the agent"""

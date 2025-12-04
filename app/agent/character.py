@@ -75,17 +75,12 @@ class Character(ToolCallAgent):
         return formatted_messages
 
     def handle_user_input(self, context: ExecutionContext):
-        """Handle user input from ExecutionContext"""
-        request = context.user_input
-        if not request:
-            return
-        current_time = get_current_time(session_id=self.session_id)
-        # Get category based on input_mode from context.data, default to PHONE
-        input_mode = context.data.get("input_mode", InputMode.PHONE)
-        if input_mode != InputMode.SKIP:
-            category = get_category_from_input_mode(input_mode)
-            user_msg = Message.user_message(request, speaker="user", created_at=current_time, category=category, visible_for_characters=self.visible_for_characters)
-            self.memory.add_message(user_msg)
+        """Handle user input from ExecutionContext
+        
+        Note: User input processing is delegated to UserAgent in flow composition.
+        This method is intentionally empty to avoid duplicate message storage.
+        """
+        pass
         
     def prepare_system_messages(self) -> list[Message]:
         """Prepare system messages for the agent"""
