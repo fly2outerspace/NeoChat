@@ -10,6 +10,8 @@ import SystemSettings from '@/components/settings/SystemSettings';
 import UserSettings from '@/components/settings/UserSettings';
 import RoleSettings from '@/components/settings/RoleSettings';
 import ModelSettings from '@/components/settings/ModelSettings';
+import MemoryView from '@/components/MemoryView';
+import RelationView from '@/components/RelationView';
 import { getCurrentSessionId, getAllSessions } from '@/lib/sessions';
 
 export default function HomePage() {
@@ -55,6 +57,20 @@ export default function HomePage() {
   const handleSessionCreated = (sessionId: string) => {
     setCurrentSessionId(sessionId);
   };
+
+  // 监听页面切换，当切换到记忆或关系页面时触发刷新事件
+  useEffect(() => {
+    if (currentView === 'memory') {
+      // 延迟一小段时间，确保组件已经渲染
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('viewSwitched', { detail: 'memory' }));
+      }, 50);
+    } else if (currentView === 'relation') {
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('viewSwitched', { detail: 'relation' }));
+      }, 50);
+    }
+  }, [currentView]);
 
   return (
     <div className="h-screen flex bg-slate-900 text-slate-50 overflow-hidden">
@@ -106,6 +122,16 @@ export default function HomePage() {
           <div className="max-w-3xl mx-auto">
             <ModelSettings />
           </div>
+        </div>
+
+        {/* Memory View - 始终挂载 */}
+        <div className={currentView === 'memory' ? 'h-full' : 'hidden'}>
+          <MemoryView />
+        </div>
+
+        {/* Relation View - 始终挂载 */}
+        <div className={currentView === 'relation' ? 'h-full' : 'hidden'}>
+          <RelationView />
         </div>
       </div>
 

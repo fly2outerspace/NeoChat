@@ -1304,7 +1304,7 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
   return (
     <div className="h-full flex flex-col bg-slate-900">
       {/* 消息区域 */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="chat-messages-area flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && (
           <div className="h-full flex items-center justify-center">
             <div className="text-center text-slate-500">

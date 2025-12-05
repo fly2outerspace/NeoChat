@@ -7,9 +7,8 @@
 **让任何想象的角色扮演场景实现，在任何切入点继续想象与创造。**
 
 ![对话](assets/sample.png)
-![远程对话](assets/remotechat.png)
 
-## Features
+## 特点 Features
 玩家可以通过管理发言对象、参与者来控制多人对话，营造家庭聚餐，暗地里的密谋或是会议。
 
 ![多人对话](assets/multi-npc.png)
@@ -20,6 +19,15 @@ NeoChat基于一个可以自定义的虚拟时间线实现，鼓励NPC在一个�
 NPC自觉管理的日程和人际关系
 
 ![管理日程和人际关系](assets/memory_relations.png)
+
+角色记忆
+![长期记忆](assets/memory.png)
+
+角色关系网
+![长期记忆](assets/relation.png)
+
+模拟远程对话
+![远程对话](assets/remotechat.png)
 
 管理存档
 

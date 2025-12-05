@@ -190,7 +190,7 @@ export default function SystemSettings() {
                 </div>
               </div>
               <p className="text-sm text-slate-400">
-                选择使用 Agent 模式（单智能体）或 Flow 模式（多智能体流程，包含策略决策）
+                选择使用 Agent 模式（单智能体）或 Flow 模式（多智能体流程，加速对话过程，后台处理记录记忆和关系网）
               </p>
             </div>
             <div className="w-full md:w-auto flex flex-col gap-2">
