@@ -36,7 +36,7 @@ class StrategyAgent(ToolCallAgent):
     special_tool_names: List[str] = Field(default_factory=lambda: [ToolName.TERMINATE, ToolName.STRATEGY])
 
 
-    # Note: This agent's messages don't include historical tool messages, so messages from user onwards in this execution won't be formatted. It's better to format user messages separately.
+   
     def _format_messages(self, messages: List[Message]) -> List[Message]:
         """Format messages for strategy agent
         Filter messages with tool calls into a clean assistant-user dialogue list
@@ -53,25 +53,27 @@ class StrategyAgent(ToolCallAgent):
         """
         formatted_messages = []
         # Categories to process: TELEGRAM(1), SPEAK_IN_PERSON(2), THOUGHT(3)
-        target_categories = {MessageCategory.TELEGRAM, MessageCategory.SPEAK_IN_PERSON, MessageCategory.THOUGHT}
+        target_categories = {MessageCategory.TELEGRAM, MessageCategory.SPEAK_IN_PERSON, MessageCategory.THOUGHT, MessageCategory.SYSTEM_INSTRUCTION}
         
         for msg in messages:
             if msg.role == "system":
                 formatted_messages.append(msg)
-            elif msg.role in {"assistant", "tool"}:
+            elif msg.role in {"user", "assistant", "tool"}:
                 if msg.category in target_categories:
                     # Convert assistant or tool message to assistant message with formatted content
                     indicator = CATEGORY_TO_INDICATOR_MAP.get(msg.category, "")
-                    formatted_content = f"{msg.created_at} - {indicator} - {msg.speaker}: {msg.content}"
                     if msg.speaker != self.name: # TODO: Should use character_id for filtering instead of speaker in the future
+                        # Note: This agent's messages don't include historical tool messages, so messages from user onwards in this execution won't be formatted. It's better to format user messages separately.
+                        # Will be formatted in format_user_messages later.
                         formatted_msg = Message.user_message(
-                            content=formatted_content,
+                            content=msg.content,
                             speaker=msg.speaker,
                             created_at=msg.created_at,
                             category=msg.category,
                             visible_for_characters=self.visible_for_characters
                         )
                     else:
+                        formatted_content = f"{msg.created_at} - {indicator} - {msg.speaker}: {msg.content}"
                         formatted_msg = Message.assistant_message(
                             content=formatted_content,
                             speaker=msg.speaker,
@@ -107,6 +109,8 @@ class StrategyAgent(ToolCallAgent):
         return messages
 
     def handle_user_input(self, context: ExecutionContext):
+        current_time = get_current_time(session_id=self.session_id) if self.session_id else get_current_time()
+        self.history_messages, _ = Memory.get_messages_around_time(self.session_id, time_point=current_time, hours=24.0, max_messages=150, character_id=self.character_id)
         pass
 
     def prepare_system_messages(self) -> list[Message]:
@@ -212,7 +216,8 @@ class StrategyAgent(ToolCallAgent):
         messages.extend(aid_message)
 
         if self.next_step_prompt:
-            next_step_msg = Message.system_message(self.next_step_prompt, speaker=self.name, created_at=current_time, visible_for_characters=self.visible_for_characters)
+            formatted_prompt = self.next_step_prompt.format(current_step=self.current_step - 1)
+            next_step_msg = Message.system_message(formatted_prompt, speaker=self.name, created_at=current_time, visible_for_characters=self.visible_for_characters)
             messages.append(next_step_msg)
         messages = self.format_user_messages(messages)
         return messages

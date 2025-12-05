@@ -15,7 +15,6 @@ from app.runnable.base import Runnable
 from app.runnable.context import ExecutionContext
 from app.tool import (
     DialogueHistory,
-    Reflection,
     RelationTool,
     ScenarioReader,
     ScheduleReader,
@@ -66,7 +65,6 @@ class CharacterFlow(SequentialFlow):
                     Strategy(),
                     Terminate(),
                     WebSearch(),
-                    Reflection(),
                     DialogueHistory(session_id=ctx.session_id, character_id=self.character_id),
                     ScheduleReader(session_id=ctx.session_id, character_id=self.character_id),
                     ScheduleWriter(session_id=ctx.session_id, character_id=self.character_id),

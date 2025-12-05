@@ -234,7 +234,8 @@ class WriterAgent(ToolCallAgent):
         messages.extend(aid_message)
 
         if self.next_step_prompt:
-            next_step_msg = Message.system_message(self.next_step_prompt, speaker=self.name, created_at=current_time, visible_for_characters=self.visible_for_characters)
+            formatted_prompt = self.next_step_prompt.format(current_step=self.current_step - 1)
+            next_step_msg = Message.system_message(formatted_prompt, speaker=self.name, created_at=current_time, visible_for_characters=self.visible_for_characters)
             messages.append(next_step_msg)
         messages = self.format_user_messages(messages)
         return messages

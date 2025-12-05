@@ -36,7 +36,8 @@ class SpeakAgent(ChatAgent):
         system_prompt = self.system_prompt.format(
             roleplay_prompt=self.roleplay_prompt,
             long_term_memory=long_term_memory, 
-            relationship=relationship
+            relationship=relationship,
+            inner_thought=self.inner_thought or "None"
         )
         system_msg = Message.system_message(system_prompt, speaker=self.name, created_at=current_time, visible_for_characters=[self.character_id])
         return [system_msg]
@@ -110,7 +111,6 @@ class SpeakAgent(ChatAgent):
 
         return schedule_scenario_content, relations_content
 
-        return memory_messages
     def handle_user_input(self, context: ExecutionContext):
         """Handle user input from ExecutionContext"""
         strategy = context.data.get("strategy", "")
@@ -199,7 +199,7 @@ class SpeakAgent(ChatAgent):
         current_time = get_current_time(session_id=self.session_id) if self.session_id else get_current_time()
         messages, _ = Memory.get_messages_around_time(self.session_id, time_point=current_time, max_messages=100, character_id=self.character_id)
         messages = self._format_messages(messages)
-        aid_content = f"""**current time**: {current_time}\n**Your Current Inner Thought:** [{self.inner_thought or "None"}] Perform as your thought but never print it out.\n{HELPER_PROMPT}"""
-        aid_message = Message.system_message(aid_content, speaker=self.name, created_at=current_time, visible_for_characters=self.visible_for_characters)
+        aid_content = f"""**current time**: {current_time}\n{HELPER_PROMPT}"""
+        aid_message = Message.user_message(aid_content, speaker=self.name, created_at=current_time, visible_for_characters=self.visible_for_characters)
         messages.append(aid_message)
         return messages
