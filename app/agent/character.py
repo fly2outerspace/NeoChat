@@ -3,7 +3,8 @@ from typing import AsyncIterator, List, Optional, Literal
 from pydantic import Field
 
 from app.agent.toolcall import ToolCallAgent
-from app.schema import AgentStreamEvent, Message, ToolCall
+from app.runnable.context import ExecutionContext
+from app.schema import ExecutionEvent, ExecutionEventType, Message, ToolCall
 from app.memory import Memory
 from app.utils.enums import MessageCategory, InputMode
 from app.utils.streaming import stream_by_category
@@ -73,14 +74,13 @@ class Character(ToolCallAgent):
                 formatted_messages.append(msg)
         return formatted_messages
 
-    def handle_user_input(self, request: str, **kwargs):
-        current_time = get_current_time(session_id=self.session_id)
-        # Get category based on input_mode from kwargs, default to PHONE
-        input_mode = kwargs.get("input_mode", InputMode.PHONE)
-        if input_mode != InputMode.SKIP:
-            category = get_category_from_input_mode(input_mode)
-            user_msg = Message.user_message(request, speaker="user", created_at=current_time, category=category, visible_for_characters=self.visible_for_characters)
-            self.memory.add_message(user_msg)
+    def handle_user_input(self, context: ExecutionContext):
+        """Handle user input from ExecutionContext
+        
+        Note: User input processing is delegated to UserAgent in flow composition.
+        This method is intentionally empty to avoid duplicate message storage.
+        """
+        pass
         
     def prepare_system_messages(self) -> list[Message]:
         """Prepare system messages for the agent"""
@@ -197,7 +197,7 @@ class Character(ToolCallAgent):
 
     async def handle_tool_result_stream(
         self, command: ToolCall, result: ToolResult
-    ) -> AsyncIterator[AgentStreamEvent]:
+    ) -> AsyncIterator[ExecutionEvent]:
         """Handle tool result with immediate streaming for output tools"""
         message_type = command.function.name
         
@@ -209,8 +209,8 @@ class Character(ToolCallAgent):
         
         # Emit structured data if args exist
         if result.args:
-            yield AgentStreamEvent(
-                type="tool_output",
+            yield ExecutionEvent(
+                type=ExecutionEventType.TOKEN,
                 content=None,
                 message_type=message_type,
                 message_id=command.id,
@@ -230,8 +230,8 @@ class Character(ToolCallAgent):
         if category in {MessageCategory.TELEGRAM, MessageCategory.SPEAK_IN_PERSON}:
             # Use category-specific streaming mode (typewriter for speak_in_person, line-by-line for telegram)
             async for chunk in stream_by_category(content, category):
-                yield AgentStreamEvent(
-                    type="tool_output",
+                yield ExecutionEvent(
+                    type=ExecutionEventType.TOKEN,
                     content=chunk,
                     message_type=message_type,
                     message_id=command.id,
@@ -257,8 +257,8 @@ class Character(ToolCallAgent):
 
             # Stream the tool output so frontend can display progress
             for chunk in self._chunk_content(content):
-                yield AgentStreamEvent(
-                    type="token",
+                yield ExecutionEvent(
+                    type=ExecutionEventType.TOKEN,
                     content=chunk,
                     step=self.current_step,
                     total_steps=self.max_steps,

@@ -11,28 +11,16 @@ from app.tool.base import BaseTool, ToolResult
 from app.utils.enums import ToolName
 
 
-_SCENARIO_WRITER_DESCRIPTION = """
-A tool to write and manage the detailed scenarios of your memory.
+_SCENARIO_WRITER_DESCRIPTION = """A tool to write and manage the detailed scenarios of your memory.
 
-High-level purpose:
-- Use scenarios to record important episodes as vivid, subjective stories tied to a time range
-  (for example, after `scenario_reader` finds no existing scenario for a time or keyword and you
-  decide this episode should be stored).
+Use this tool to:
+- 'create' a new scenario entry for an important past episode or memorable event,
+- 'update' an existing scenario entry to adjust its time window, content, or title,
+- 'delete' a scenario entry that is no longer relevant.
 
-Actions and required fields:
-- 'create':
-  - MUST provide: `title`, `start_at`, `end_at`, `content`.
-  - `title` should be a short summary line (key event + important people/place),
-    while `content` contains the full narrative details.
-
-- 'update':
-  - MUST provide: `scenario_id`.
-  - MUST update at least one of: `content`, `start_at`, `end_at`, `title`.
-  - Use this to refine, extend, or correct an existing scenario’s story or time range.
-
-- 'delete':
-  - MUST provide: `scenario_id`.
-  - Use this when a scenario is no longer relevant or should be forgotten.
+Guidelines:
+- Each scenario should be a vivid, subjective story tied to a specific time range.
+- Write scenarios from your own perspective with personal meaning.
 """
 
 
@@ -54,21 +42,21 @@ class ScenarioWriter(BaseTool):
                 "type": "string",
                 "description": "Business scenario_id of the scenario. Required for 'update' and 'delete' actions.",
             },
+            "title": {
+                "type": "string",
+                "description": "Scenario title (key event + important people/place). Required for 'create' action.",
+            },
             "start_at": {
                 "type": "string",
-                "description": "Start time in format 'YYYY-MM-DD HH:MM:SS' (e.g., '2024-01-15 14:00:00'). Required for 'create' action. Optional for 'update' action.",
+                "description": "Start time in format 'YYYY-MM-DD HH:MM:SS' (e.g., '2024-01-15 14:00:00'). Required for 'create' action.",
             },
             "end_at": {
                 "type": "string",
-                "description": "End time in format 'YYYY-MM-DD HH:MM:SS' (e.g., '2024-01-15 15:00:00'). Required for 'create' action. Optional for 'update' action.",
+                "description": "End time in format 'YYYY-MM-DD HH:MM:SS' (e.g., '2024-01-15 15:00:00'). Required for 'create' action.",
             },
             "content": {
                 "type": "string",
-                "description": "Scenario content/description. Required for 'create' action. Optional for 'update' action.",
-            },
-            "title": {
-                "type": "string",
-                "description": "Scenario title. Required for 'create' action. Optional for 'update' action.",
+                "description": "Full narrative details of the scenario. Required for 'create' action. Optional for 'update' action.",
             },
         },
         "required": ["action"],
@@ -114,15 +102,24 @@ class ScenarioWriter(BaseTool):
                 # Create a new scenario entry (with overwrite support)
                 if not start_at or not end_at:
                     raise ToolError(
-                        "Parameters 'start_at' and 'end_at' are required when action is 'create'"
+                        "Parameters 'start_at' and 'end_at' are required when action is 'create'. "
+                        "Example: {\"action\": \"create\", \"title\": \"Meeting with John\", "
+                        "\"start_at\": \"2024-01-15 14:00:00\", \"end_at\": \"2024-01-15 15:00:00\", "
+                        "\"content\": \"Had a productive discussion...\"}"
                     )
                 if not content:
                     raise ToolError(
-                        "Parameter 'content' is required when action is 'create'"
+                        "Parameter 'content' is required when action is 'create'. "
+                        "Example: {\"action\": \"create\", \"title\": \"Meeting with John\", "
+                        "\"start_at\": \"2024-01-15 14:00:00\", \"end_at\": \"2024-01-15 15:00:00\", "
+                        "\"content\": \"Had a productive discussion...\"}"
                     )
                 if not title:
                     raise ToolError(
-                        "Parameter 'title' is required when action is 'create'"
+                        "Parameter 'title' is required when action is 'create'. "
+                        "Example: {\"action\": \"create\", \"title\": \"Meeting with John\", "
+                        "\"start_at\": \"2024-01-15 14:00:00\", \"end_at\": \"2024-01-15 15:00:00\", "
+                        "\"content\": \"Had a productive discussion...\"}"
                     )
                 
                 # Check if user provided scenario_id (for overwrite support)

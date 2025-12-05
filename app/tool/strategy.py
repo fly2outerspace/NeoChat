@@ -35,7 +35,7 @@ class Strategy(BaseTool):
             "inner_monologue": {
                 "type": "string",
                 "description": (
-                    "A comprehensive inner_monologue covering all personal aspects for the conversation. "
+                    "A short but comprehensive inner_monologue covering all personal aspects for the conversation. "
                 ),
             },
         },

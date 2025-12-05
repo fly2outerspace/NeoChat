@@ -125,4 +125,25 @@ class MessageRepository(ABC):
             List of message dicts on the specified date, sorted by created_at
         """
         pass
+    
+    @abstractmethod
+    def count_dialogue_messages(
+        self,
+        session_id: str,
+        speaker: str,
+        categories: Optional[List[int]] = None
+    ) -> int:
+        """Count dialogue messages by speaker and categories
+        
+        This is an efficient COUNT query for calculating dialogue turns.
+        
+        Args:
+            session_id: Session ID
+            speaker: Speaker name to filter by
+            categories: List of category filters (default: [1, 2] for TELEGRAM and SPEAK_IN_PERSON)
+            
+        Returns:
+            Count of matching messages
+        """
+        pass
 

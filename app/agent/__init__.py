@@ -6,6 +6,7 @@ from app.agent.strategy import StrategyAgent
 from app.agent.chat import ChatAgent
 from app.agent.telegram import TelegramAgent
 from app.agent.speak import SpeakAgent
+from app.agent.user import UserAgent
 
 
 __all__ = [
@@ -17,4 +18,5 @@ __all__ = [
     "ChatAgent",
     "TelegramAgent",
     "SpeakAgent",
+    "UserAgent",
 ]
