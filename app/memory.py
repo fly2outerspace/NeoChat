@@ -1140,3 +1140,45 @@ class Memory(BaseModel):
         except Exception as e:
             logger.error(f"Failed to search relations by keyword: {e}")
             return []
+
+    # ========== Dialogue Turn Counting ==========
+    
+    @staticmethod
+    def count_dialogue_messages(
+        session_id: str,
+        speaker: str,
+        categories: Optional[List[int]] = None
+    ) -> int:
+        """Count dialogue messages by speaker and categories
+        
+        This is an efficient COUNT query for calculating dialogue turns.
+        Used to determine when to trigger periodic tasks (e.g., WriterAgent every 10 turns).
+        
+        Args:
+            session_id: Session ID for querying messages
+            speaker: Speaker name to filter by (e.g., character name)
+            categories: List of category filters (default: [1, 2] for TELEGRAM and SPEAK_IN_PERSON)
+            
+        Returns:
+            Count of matching messages
+            
+        Example:
+            # Count how many times "Seraphina" has spoken via TELEGRAM or SPEAK_IN_PERSON
+            count = Memory.count_dialogue_messages('session_id', 'Seraphina')
+            
+            # Trigger WriterAgent every 10 dialogue turns
+            if count > 0 and count % 10 == 0:
+                # Run WriterAgent
+                pass
+        """
+        if not session_id:
+            logger.warning("session_id is required for dialogue count")
+            return 0
+        
+        try:
+            from app.storage.sqlite_repository import SQLiteMessageRepository
+            repo = SQLiteMessageRepository()
+            return repo.count_dialogue_messages(session_id, speaker, categories)
+        except Exception as e:
+            logger.error(f"Failed to count dialogue messages: {e}")
+            return 0

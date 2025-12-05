@@ -105,3 +105,38 @@ body {
   .safelist-shadow-7 { @apply shadow-[0_0_9px_rgba(232,255,246,0.14)]; }
   .safelist-shadow-8 { @apply shadow-[0_0_8px_rgba(216,228,255,0.12)]; }
 }
+
+/* 赛博风格品红色滚动条样式 */
+/* Webkit浏览器 (Chrome, Edge, Safari) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #ff0066 0%, #ff0033 50%, #ff0044 100%);
+  border-radius: 5px;
+  border: 1px solid rgba(255, 0, 102, 0.3);
+  box-shadow: 0 0 8px rgba(255, 0, 102, 0.5), inset 0 0 4px rgba(255, 255, 255, 0.2);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #ff3388 0%, #ff3366 50%, #ff3355 100%);
+  box-shadow: 0 0 12px rgba(255, 0, 102, 0.7), inset 0 0 6px rgba(255, 255, 255, 0.3);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(180deg, #cc0055 0%, #cc0022 50%, #cc0033 100%);
+  box-shadow: 0 0 6px rgba(255, 0, 102, 0.4), inset 0 0 3px rgba(255, 255, 255, 0.15);
+}
+
+/* Firefox浏览器 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #ff0066 rgba(0, 0, 0, 0.3);
+}

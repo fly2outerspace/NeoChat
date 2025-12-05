@@ -8,6 +8,7 @@ import { useLocalStorageInput } from '@/lib/useLocalStorageInput';
 import { getChatTheme, type ChatTheme } from '@/lib/themes';
 import { listCharacters, type Character } from '@/lib/api/character';
 import { fetchSessionTime } from '@/lib/api/sessionTime';
+import { parseSSEEvent, isTokenEvent, isStatusEvent, isDoneEvent, isErrorEvent, hasToolInfo, type SSEEvent } from '@/lib/sse';
 
 const INLINE_TOOL_NAMES = new Set(['send_telegram_message', 'speak_in_person']);
 const TOOL_NAME_LABELS: Record<string, string> = {
@@ -143,6 +144,7 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
   const [isFirstSession, setIsFirstSession] = useState<boolean>(false);
   const [isClient, setIsClient] = useState(false);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
+  const [userAgentAvatar, setUserAgentAvatar] = useState<string | null>(null); // User agent avatar (character_id: "user")
   const [selectedCharacter, setSelectedCharacter] = useState<{
     character_id: string;
     name: string;
@@ -159,7 +161,18 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
   // Dropdown open states
   const [targetDropdownOpen, setTargetDropdownOpen] = useState(false);
   const [participantsDropdownOpen, setParticipantsDropdownOpen] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<{
+  const [chatModel, setChatModel] = useState<{
+    model_id: string;
+    name: string;
+    provider: string;
+    model: string;
+    base_url: string;
+    api_key: string | null;
+    max_tokens: number;
+    temperature: number;
+    api_type: string;
+  } | null>(null);
+  const [inferModel, setInferModel] = useState<{
     model_id: string;
     name: string;
     provider: string;
@@ -229,10 +242,16 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
         const characters = await listCharacters();
         setAllCharacters(characters);
         const avatarMap = new Map<string, string | null>();
+        let userAgentAvatarFound: string | null = null;
         characters.forEach((char: Character) => {
           avatarMap.set(char.character_id, char.avatar);
+          // Check if this is the user agent (character_id: "user")
+          if (char.character_id === 'user') {
+            userAgentAvatarFound = char.avatar;
+          }
         });
         setCharacterAvatarMap(avatarMap);
+        setUserAgentAvatar(userAgentAvatarFound);
       } catch (err) {
         console.error('Failed to load characters:', err);
       }
@@ -246,7 +265,9 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
       setSelectedCharacter(null);
       setTargetCharacterId('');
       setParticipantIds([]);
-      setSelectedModel(null);
+      // 重置模型状态，等待ModelSettings重新加载并触发事件
+      setChatModel(null);
+      setInferModel(null);
     };
 
     // 监听角色列表更新事件（当角色被删除或创建时）
@@ -310,14 +331,104 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
       }
     }
     
-    // 加载选中的模型信息
+    // 加载对话模型（从selected_model获取）和推理模型信息
     const storedModel = localStorage.getItem('selected_model');
+    const storedInferModel = localStorage.getItem('selected_infer_model');
+    const storedUseSameModel = localStorage.getItem('use_same_model_for_infer');
+    
+    console.log('[ChatArea] Initial load - storedModel:', storedModel ? JSON.parse(storedModel)?.model : 'null');
+    
+    // 对话模型从selected_model获取（即左侧列表中选择的模型）
     if (storedModel) {
       try {
         const modelInfo = JSON.parse(storedModel);
-        setSelectedModel(modelInfo);
+        // Try to get full model info including API key
+        if (modelInfo.model_id) {
+          import('@/lib/api/model').then(({ getModel }) => {
+            getModel(modelInfo.model_id, true)
+              .then((fullModel) => {
+                setChatModel(fullModel);
+                // Update localStorage with full model info
+                const updatedModelInfo = {
+                  model_id: fullModel.model_id,
+                  name: fullModel.name,
+                  provider: fullModel.provider,
+                  model: fullModel.model,
+                  base_url: fullModel.base_url,
+                  api_key: fullModel.api_key,
+                  max_tokens: fullModel.max_tokens,
+                  temperature: fullModel.temperature,
+                  api_type: fullModel.api_type,
+                };
+                localStorage.setItem('selected_model', JSON.stringify(updatedModelInfo));
+              })
+              .catch((e) => {
+                console.error('Failed to get full chat model info:', e);
+                // Fallback to stored info
+                setChatModel(modelInfo);
+              });
+          }).catch((e) => {
+            console.error('Failed to import model API:', e);
+            setChatModel(modelInfo);
+          });
+        } else {
+          setChatModel(modelInfo);
+        }
       } catch (e) {
         console.error('Failed to parse stored model:', e);
+      }
+    }
+    
+    // 推理模型：如果use_same_model_for_infer为true，则使用对话模型；否则使用selected_infer_model
+    const useSameModel = storedUseSameModel === null || storedUseSameModel === 'true';
+    
+    if (useSameModel) {
+      // 使用对话模型作为推理模型
+      if (storedModel) {
+        try {
+          const modelInfo = JSON.parse(storedModel);
+          setInferModel(modelInfo);
+        } catch (e) {
+          console.error('Failed to parse stored model for infer:', e);
+        }
+      }
+    } else if (storedInferModel) {
+      try {
+        const inferModelInfo = JSON.parse(storedInferModel);
+        // Try to get full model info including API key
+        if (inferModelInfo.model_id) {
+          import('@/lib/api/model').then(({ getModel }) => {
+            getModel(inferModelInfo.model_id, true)
+              .then((fullModel) => {
+                setInferModel(fullModel);
+                // Update localStorage with full model info
+                const updatedModelInfo = {
+                  model_id: fullModel.model_id,
+                  name: fullModel.name,
+                  provider: fullModel.provider,
+                  model: fullModel.model,
+                  base_url: fullModel.base_url,
+                  api_key: fullModel.api_key,
+                  max_tokens: fullModel.max_tokens,
+                  temperature: fullModel.temperature,
+                  api_type: fullModel.api_type,
+                };
+                localStorage.setItem('selected_infer_model', JSON.stringify(updatedModelInfo));
+              })
+              .catch((e) => {
+                console.error('Failed to get full infer model info:', e);
+                // Fallback to stored info
+                setInferModel(inferModelInfo);
+              });
+          }).catch((e) => {
+            console.error('Failed to import model API:', e);
+            setInferModel(inferModelInfo);
+          });
+        } else {
+          setInferModel(inferModelInfo);
+        }
+      } catch (e) {
+        console.error('Failed to parse stored infer model:', e);
       }
     }
     
@@ -349,17 +460,23 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
         const characters = await listCharacters();
         setAllCharacters(characters);
         const avatarMap = new Map<string, string | null>();
+        let userAgentAvatarFound: string | null = null;
         characters.forEach((char: Character) => {
           avatarMap.set(char.character_id, char.avatar);
+          // Check if this is the user agent (character_id: "user")
+          if (char.character_id === 'user') {
+            userAgentAvatarFound = char.avatar;
+          }
         });
         setCharacterAvatarMap(avatarMap);
+        setUserAgentAvatar(userAgentAvatarFound);
       } catch (err) {
         console.error('Failed to reload characters after update:', err);
       }
     };
     
-    // 监听模型更新事件
-    const handleModelUpdate = (e: Event) => {
+    // 监听对话模型更新事件（从modelUpdated事件改为chatModelUpdated）
+    const handleChatModelUpdate = (e: Event) => {
       const customEvent = e as CustomEvent<{
         model_id: string;
         name: string;
@@ -371,7 +488,29 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
         temperature: number;
         api_type: string;
       } | null>;
-      setSelectedModel(customEvent.detail);
+      console.log('[ChatArea] Received chatModelUpdated event:', customEvent.detail?.model);
+      setChatModel(customEvent.detail);
+      // 如果使用相同模型作为推理模型，也更新推理模型
+      const useSameModel = localStorage.getItem('use_same_model_for_infer');
+      if (useSameModel === null || useSameModel === 'true') {
+        setInferModel(customEvent.detail);
+      }
+    };
+
+    // 监听推理模型更新事件
+    const handleInferModelUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<{
+        model_id: string;
+        name: string;
+        provider: string;
+        model: string;
+        base_url: string;
+        api_key: string | null;
+        max_tokens: number;
+        temperature: number;
+        api_type: string;
+      } | null>;
+      setInferModel(customEvent.detail);
     };
     
     // 监听流式设置更新事件
@@ -400,7 +539,8 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
     
     window.addEventListener('avatarUpdated', handleAvatarUpdate);
     window.addEventListener('characterUpdated', handleCharacterUpdate);
-    window.addEventListener('modelUpdated', handleModelUpdate);
+    window.addEventListener('chatModelUpdated', handleChatModelUpdate);
+    window.addEventListener('inferModelUpdated', handleInferModelUpdate);
     window.addEventListener('streamingSettingUpdated', handleStreamingUpdate);
     window.addEventListener('chatModeUpdated', handleChatModeUpdate);
     window.addEventListener('immersiveModeUpdated', handleImmersiveModeUpdate);
@@ -415,7 +555,8 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
     return () => {
       window.removeEventListener('avatarUpdated', handleAvatarUpdate);
       window.removeEventListener('characterUpdated', handleCharacterUpdate);
-      window.removeEventListener('modelUpdated', handleModelUpdate);
+      window.removeEventListener('chatModelUpdated', handleChatModelUpdate);
+      window.removeEventListener('inferModelUpdated', handleInferModelUpdate);
       window.removeEventListener('streamingSettingUpdated', handleStreamingUpdate);
       window.removeEventListener('chatModeUpdated', handleChatModeUpdate);
       window.removeEventListener('immersiveModeUpdated', handleImmersiveModeUpdate);
@@ -752,25 +893,52 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
           ...(participantIds.length > 0 && {
             participants: participantIds,
           }),
-          ...(selectedModel && {
-            model_info: {
-              model_id: selectedModel.model_id,
-              name: selectedModel.name,
-              provider: selectedModel.provider,
-              model: selectedModel.model,
-              base_url: selectedModel.base_url,
-              api_key: selectedModel.api_key,
-              max_tokens: selectedModel.max_tokens,
-              temperature: selectedModel.temperature,
-              api_type: selectedModel.api_type,
+          ...(chatModel && {
+            chat_modelinfo: {
+              model_id: chatModel.model_id,
+              name: chatModel.name,
+              provider: chatModel.provider,
+              model: chatModel.model,
+              base_url: chatModel.base_url,
+              api_key: chatModel.api_key,
+              max_tokens: chatModel.max_tokens,
+              temperature: chatModel.temperature,
+              api_type: chatModel.api_type,
             },
           }),
+          // 推理模型：如果useSameModelForInfer为true，使用chatModel；否则使用inferModel
+          ...((() => {
+            const useSameModel = localStorage.getItem('use_same_model_for_infer');
+            const shouldUseSameModel = useSameModel === null || useSameModel === 'true';
+            const modelToUse = shouldUseSameModel ? chatModel : inferModel;
+            
+            if (modelToUse) {
+              return {
+                infer_modelinfo: {
+                  model_id: modelToUse.model_id,
+                  name: modelToUse.name,
+                  provider: modelToUse.provider,
+                  model: modelToUse.model,
+                  base_url: modelToUse.base_url,
+                  api_key: modelToUse.api_key,
+                  max_tokens: modelToUse.max_tokens,
+                  temperature: modelToUse.temperature,
+                  api_type: modelToUse.api_type,
+                },
+              };
+            }
+            return {};
+          })()),
         };
         
         // Flow 模式需要添加 flow_type
         if (chatMode === 'flow') {
-          requestBody.flow_type = 'character';
+          requestBody.flow_type = 'chat_parallel';
         }
+        
+        // Debug: Log the model being used
+        console.log('[ChatArea] Sending request with chat_model:', requestBody.chat_modelinfo?.model);
+        console.log('[ChatArea] Sending request with infer_model:', requestBody.infer_modelinfo?.model);
         
         const res = await fetch(endpoint, {
           method: 'POST',
@@ -809,87 +977,84 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
             return true;
           }
 
-          try {
-            const chunk = JSON.parse(payload);
-            const choice = chunk?.choices?.[0];
-            const delta = choice?.delta;
-            const toolEvent = delta?.tool_event;
-            const toolName = typeof toolEvent?.message_type === 'string' ? toolEvent.message_type : null;
-            
-            // Handle tool_status updates
-            const toolStatusUpdate = delta?.tool_status;
-            if (typeof toolStatusUpdate === 'string') {
-              setToolStatus(toolStatusUpdate);
-              // Keep waiting animation visible when tool_status is present
-              setIsWaitingResponse(true);
-            }
-            
-            // Handle content updates (tokens)
-            const deltaContent = delta?.content;
-            if (typeof deltaContent === 'string') {
-              // Get message_id from tool_event if available (for both tool outputs and text messages)
-              const messageId = toolEvent?.message_id;
-              ensureAssistantPlaceholder(messageId);
-              
-              const isExternalToolOutput =
-                toolEvent?.type === 'tool_output' &&
-                toolName &&
-                !INLINE_TOOL_NAMES.has(toolName.toLowerCase());
+          const event = parseSSEEvent(payload);
+          if (!event) {
+            return false;
+          }
 
-              if (isExternalToolOutput && toolName) {
-                hasExternalToolOutput = true;
-                appendToolOutput(toolName, toolEvent?.message_id, deltaContent);
-                if (showLiveUpdates && placeholderIndexRef.current !== null) {
-                  const shouldSaveOutputs = shouldPersistNow();
-                  updateAssistantToolOutputs(
-                    toolOutputsRef.current[placeholderIndexRef.current] || [],
-                    currentSessionId,
-                    shouldSaveOutputs
-                  );
-                }
-              } else {
-                // This is inline tool output (send_telegram_message or speak_in_person)
-                // Track the tool name for the first chunk
-                if (!currentInlineToolName && toolName) {
-                  currentInlineToolName = toolName;
-                }
-                // Update message_id if available
-                if (messageId) {
-                  currentTextMessageId = messageId;
-                }
-                finalContentBuffer += deltaContent;
-                if (showLiveUpdates) {
-                  streamedContent += deltaContent;
-                  const shouldSaveContent = shouldPersistNow();
-                  // Update placeholder with message_id
-                  setMessages((prev) => {
-                    if (placeholderIndexRef.current === null || placeholderIndexRef.current >= prev.length) {
-                      return prev;
-                    }
-                    const updated = [...prev];
-                    updated[placeholderIndexRef.current] = {
-                      ...updated[placeholderIndexRef.current],
-                      content: streamedContent,
-                      toolName: currentInlineToolName,
-                      clientMessageId: currentTextMessageId,
-                    };
-                    if (shouldSaveContent && currentSessionId) {
-                      saveSessionMessages(currentSessionId, updated);
-                    }
-                    return updated;
-                  });
-                }
+          // Handle status events
+          if (isStatusEvent(event)) {
+            setToolStatus(event.status);
+            setIsWaitingResponse(true);
+            return false;
+          }
+          
+          // Handle done event
+          if (isDoneEvent(event)) {
+            setIsWaitingResponse(false);
+            return true;
+          }
+          
+          // Handle error event
+          if (isErrorEvent(event)) {
+            console.error('SSE error:', event.content);
+            setToolStatus(`❌ ${event.content}`);
+            return false;
+          }
+          
+          // Handle token events (content)
+          if (isTokenEvent(event)) {
+            const toolName = hasToolInfo(event) ? event.tool.name : null;
+            const messageId = hasToolInfo(event) ? event.tool.id : undefined;
+            
+            ensureAssistantPlaceholder(messageId);
+            
+            // Check if this is external tool output (not inline)
+            const isExternalToolOutput = toolName && !INLINE_TOOL_NAMES.has(toolName.toLowerCase());
+
+            if (isExternalToolOutput && toolName) {
+              hasExternalToolOutput = true;
+              appendToolOutput(toolName, messageId, event.content);
+              if (showLiveUpdates && placeholderIndexRef.current !== null) {
+                const shouldSaveOutputs = shouldPersistNow();
+                updateAssistantToolOutputs(
+                  toolOutputsRef.current[placeholderIndexRef.current] || [],
+                  currentSessionId,
+                  shouldSaveOutputs
+                );
+              }
+            } else {
+              // Inline tool output or regular text
+              if (!currentInlineToolName && toolName) {
+                currentInlineToolName = toolName;
+              }
+              if (messageId) {
+                currentTextMessageId = messageId;
+              }
+              finalContentBuffer += event.content;
+              if (showLiveUpdates) {
+                streamedContent += event.content;
+                const shouldSaveContent = shouldPersistNow();
+                setMessages((prev) => {
+                  if (placeholderIndexRef.current === null || placeholderIndexRef.current >= prev.length) {
+                    return prev;
+                  }
+                  const updated = [...prev];
+                  updated[placeholderIndexRef.current] = {
+                    ...updated[placeholderIndexRef.current],
+                    content: streamedContent,
+                    toolName: currentInlineToolName,
+                    clientMessageId: currentTextMessageId,
+                  };
+                  if (shouldSaveContent && currentSessionId) {
+                    saveSessionMessages(currentSessionId, updated);
+                  }
+                  return updated;
+                });
               }
             }
-            
-            if (choice?.finish_reason) {
-              // Hide waiting animation when finished
-              setIsWaitingResponse(false);
-              return true;
-            }
-          } catch (parseError) {
-            console.error('Failed to parse streaming chunk', parseError);
           }
+          
           return false;
         };
 
@@ -1202,8 +1367,8 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
               let avatarAlt: string;
               
               if (isUser) {
-                // User messages always use user avatar
-                avatarSrc = userAvatar;
+                // User messages: prioritize user agent avatar (character_id: "user"), fallback to userAvatar
+                avatarSrc = userAgentAvatar || userAvatar;
                 avatarAlt = '用户头像';
               } else {
                 // Assistant messages: use character avatar if character_id exists
@@ -1230,14 +1395,35 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
 
           // Show time at the top of the entire message group (before tool outputs and bubbles)
           const displayTime = m.virtualTime ? formatVirtualTime(m.virtualTime) : null;
+          
+          // Build time string with character name
+          let timeString: string | null = null;
+          if (displayTime) {
+            if (isUser) {
+              // User messages: "时间 - user"
+              timeString = `${displayTime} - user`;
+            } else {
+              // Assistant messages: "角色名字 - 时间"
+              if (m.character_id) {
+                const character = allCharacters.find(c => c.character_id === m.character_id);
+                if (character) {
+                  timeString = `${character.name} - ${displayTime}`;
+                } else {
+                  timeString = displayTime;
+                }
+              } else {
+                timeString = displayTime;
+              }
+            }
+          }
 
           return (
             <div key={`msg-${messageIdx}`} className="space-y-1">
               {/* Time display at the top of the message group */}
-              {displayTime && (
+              {timeString && (
                 <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-1 px-1`}>
                   <span className={`text-xs text-slate-500 ${isUser ? 'mr-11' : 'ml-11'}`}>
-                    {displayTime}
+                    {timeString}
                   </span>
                 </div>
               )}

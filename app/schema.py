@@ -1,3 +1,8 @@
+"""Schema definitions for the application
+
+This module contains all Pydantic models and enums used throughout the application.
+"""
+
 from datetime import datetime
 from enum import Enum
 from typing import Any, List, Literal, Optional, Union
@@ -7,14 +12,41 @@ from pydantic import BaseModel, Field
 from app.utils.enums import MessageCategory
 
 
-class AgentState(str, Enum):
-    """Agent execution states"""
+# =============================================================================
+# Execution States
+# =============================================================================
 
-    IDLE = "IDLE"
-    RUNNING = "RUNNING"
-    FINISHED = "FINISHED"
-    ERROR = "ERROR"
+class ExecutionState(str, Enum):
+    """Unified execution state for all Runnables (Agents and Flows)"""
+    IDLE = "idle"
+    RUNNING = "running"
+    PAUSED = "paused"
+    FINISHED = "finished"
+    ERROR = "error"
 
+
+class ExecutionEventType(str, Enum):
+    """Event types for execution streaming
+    
+    Unified event types used by both ExecutionEvent (internal) and SSEEvent (API).
+    """
+    TOKEN = "token"      # Text content chunk
+    STATUS = "status"    # Status/progress update
+    STEP = "step"        # Execution step marker
+    DONE = "done"        # Execution complete
+    ERROR = "error"      # Error occurred
+
+
+class ControlSignal(str, Enum):
+    """Control signals for execution flow"""
+    TERMINATE = "terminate"  # Terminate all execution immediately
+    PAUSE = "pause"          # Pause execution
+    RESUME = "resume"        # Resume execution
+
+
+# =============================================================================
+# Tool and Function Types
+# =============================================================================
 
 class Function(BaseModel):
     name: str
@@ -23,18 +55,20 @@ class Function(BaseModel):
 
 class ToolCall(BaseModel):
     """Represents a tool/function call in a message"""
-
     id: str
     type: str = "function"
     function: Function
 
 
+# =============================================================================
+# Message Types
+# =============================================================================
+
 class QueryMetadata(BaseModel):
     """Metadata for query results indicating if there are more messages available"""
-    
     has_more_before: bool = Field(
         default=False,
-        description="Whether there are more messages before the query range (for around_time queries)"
+        description="Whether there are more messages before the query range"
     )
     has_more_after: bool = Field(
         default=False,
@@ -42,7 +76,7 @@ class QueryMetadata(BaseModel):
     )
     time_point: Optional[str] = Field(
         default=None,
-        description="Time point used for around_time queries (for reference)"
+        description="Time point used for around_time queries"
     )
 
 
@@ -100,7 +134,6 @@ class Message(BaseModel):
         if self.content is not None:
             message["content"] = self.content
         if self.tool_calls is not None:
-            # Handle both dict format (from Message.from_tool_calls) and ToolCall objects
             tool_calls_list = []
             for tc in self.tool_calls:
                 if isinstance(tc, dict):
@@ -113,7 +146,7 @@ class Message(BaseModel):
                     tool_calls_list.append(tc)
             message["tool_calls"] = tool_calls_list
         if self.tool_name is not None:
-            message["name"] = self.tool_name  # Keep "name" for OpenAI API compatibility
+            message["name"] = self.tool_name
         if self.speaker is not None:
             message["speaker"] = self.speaker
         if self.tool_call_id is not None:
@@ -161,16 +194,7 @@ class Message(BaseModel):
     def from_tool_calls(
         cls, tool_calls: List[Any], content: Union[str, List[str]] = "", speaker: Optional[str] = "assistant", created_at: Optional[str] = None, category: int = MessageCategory.NORMAL, visible_for_characters: Optional[List[str]] = None, **kwargs
     ):
-        """Create ToolCallsMessage from raw tool calls.
-
-        Args:
-            tool_calls: Raw tool calls from LLM
-            content: Optional message content
-            speaker: Optional speaker/agent name (default: "assistant")
-            created_at: Optional timestamp. If None, uses current time.
-            category: Message category identifier (default: 0)
-            visible_for_characters: Optional list of character IDs that this message is visible to
-        """
+        """Create ToolCallsMessage from raw tool calls."""
         if created_at is None:
             from app.utils import get_current_time
             created_at = get_current_time()
@@ -183,135 +207,187 @@ class Message(BaseModel):
         )
 
 
+# =============================================================================
+# Domain Models
+# =============================================================================
+
 class Scenario(BaseModel):
     """Represents a scenario window bound to a session"""
-
     session_id: str = Field(..., description="Owning session identifier")
-    scenario_id: Optional[str] = Field(
-        default=None,
-        description="Business identifier for scenario",
-    )
+    scenario_id: Optional[str] = Field(default=None, description="Business identifier for scenario")
     start_at: str = Field(..., description="Scenario start timestamp")
     end_at: str = Field(..., description="Scenario end timestamp")
     content: str = Field(default="", description="Scenario content")
     title: str = Field(default="", description="Scenario title")
-    created_at: Optional[str] = Field(
-        default=None,
-        description="Timestamp when the scenario record was created",
-    )
+    created_at: Optional[str] = Field(default=None, description="Timestamp when created")
 
 
 class ScheduleEntry(BaseModel):
     """Represents a schedule entry"""
-
-    entry_id: str = Field(..., description="Unique business identifier for the schedule entry")
+    entry_id: str = Field(..., description="Unique business identifier")
     session_id: str = Field(..., description="Owning session identifier")
     start_at: str = Field(..., description="Schedule start timestamp")
     end_at: str = Field(..., description="Schedule end timestamp")
     content: str = Field(default="", description="Schedule content")
-    created_at: Optional[str] = Field(
-        default=None,
-        description="Timestamp when the schedule record was created",
-    )
+    created_at: Optional[str] = Field(default=None, description="Timestamp when created")
 
 
 class Relation(BaseModel):
     """Represents a relationship entry"""
-
-    relation_id: str = Field(..., description="Unique business identifier for the relation")
+    relation_id: str = Field(..., description="Unique business identifier")
     session_id: str = Field(..., description="Owning session identifier")
-    name: str = Field(..., description="Name of the person/entity in the relationship")
+    name: str = Field(..., description="Name of the person/entity")
     knowledge: str = Field(default="", description="Knowledge about this relationship")
     progress: str = Field(default="", description="Progress/status of the relationship")
-    created_at: Optional[str] = Field(
-        default=None,
-        description="Timestamp when the relation record was created",
-    )
+    created_at: Optional[str] = Field(default=None, description="Timestamp when created")
 
 
-class AgentStreamEvent(BaseModel):
-    """Streaming event emitted during agent execution"""
+# =============================================================================
+# Unified Execution Event
+# =============================================================================
+
+class ExecutionEvent(BaseModel):
+    """Unified streaming event for all Runnables (Agents and Flows)
     
-    type: Literal["token", "tool_status", "tool_output", "step", "final", "error"] = Field(
-        ..., description="Event type"
-    )
-    content: Optional[str] = Field(
-        default=None, description="Event content (token text, status message, etc.)"
-    )
-    step: Optional[int] = Field(
-        default=None, description="Current step number (for step events)"
-    )
-    total_steps: Optional[int] = Field(
-        default=None, description="Total steps (for step events)"
-    )
-    message_type: Optional[str] = Field(
-        default=None, description="Message type (e.g., tool name, message type)"
-    )
-    message_id: Optional[str] = Field(
-        default=None, description="Message ID (e.g., tool call ID, message ID)"
-    )
-    metadata: Optional[dict] = Field(
-        default=None, description="Additional metadata"
-    )
-
-
-class FlowState(str, Enum):
-    """Flow execution states"""
+    Event Types (ExecutionEventType):
+    - TOKEN: Text content chunk (streaming text, tool output)
+    - STATUS: Status/progress update (tool status, thinking status)
+    - STEP: Execution step marker (agent step, flow node step)
+    - DONE: Execution complete
+    - ERROR: Error occurred
     
-    IDLE = "IDLE"
-    RUNNING = "RUNNING"
-    PAUSED = "PAUSED"
-    FINISHED = "FINISHED"
-    ERROR = "ERROR"
-
-
-class FlowEvent(BaseModel):
-    """Streaming event emitted during flow execution
-    
-    Extends AgentStreamEvent with flow-specific metadata.
-    Compatible with AgentStreamEvent for seamless integration.
+    Attributes:
+        type: Event type
+        content: Event content (text, status message, etc.)
+        step: Current step number
+        total_steps: Total number of steps
+        message_type: Source type (tool name, agent name, etc.)
+        message_id: Source identifier (tool call ID, etc.)
+        flow_id: Flow instance ID (for flow events)
+        node_id: Node ID that generated this event
+        stage: Flow stage name
+        execution_path: Full execution path for nested runnables
+        control: Control signal for flow control
+        metadata: Additional metadata
     """
     
-    type: Literal["token", "tool_status", "tool_output", "step", "final", "error", "flow_step"] = Field(
-        ..., description="Event type"
-    )
+    # Event type
+    type: ExecutionEventType = Field(..., description="Event type")
+    
+    # Content
     content: Optional[str] = Field(
-        default=None, description="Event content (token text, status message, etc.)"
-    )
-    step: Optional[int] = Field(
-        default=None, description="Current step number (for step events)"
-    )
-    total_steps: Optional[int] = Field(
-        default=None, description="Total steps (for step events)"
-    )
-    message_type: Optional[str] = Field(
-        default=None, description="Message type (e.g., tool name, message type)"
-    )
-    message_id: Optional[str] = Field(
-        default=None, description="Message ID (e.g., tool call ID, message ID)"
-    )
-    metadata: Optional[dict] = Field(
-        default=None, description="Additional metadata"
-    )
-    # Flow-specific fields
-    flow_id: Optional[str] = Field(
-        default=None, description="Flow instance ID"
-    )
-    node_id: Optional[str] = Field(
-        default=None, description="Node ID that generated this event"
-    )
-    stage: Optional[str] = Field(
-        default=None, description="Flow stage name (e.g., 'planner', 'executor')"
+        default=None,
+        description="Event content (token text, status message, etc.)"
     )
     
-    def to_agent_event(self) -> AgentStreamEvent:
-        """Convert FlowEvent to AgentStreamEvent for compatibility"""
-        return AgentStreamEvent(
-            type=self.type,
-            content=self.content,
-            step=self.step,
-            total_steps=self.total_steps,
-            message_type=self.message_type,
-            message_id=self.message_id,
-            metadata=self.metadata,
-        )
+    # Step information
+    step: Optional[int] = Field(
+        default=None,
+        description="Current step number"
+    )
+    total_steps: Optional[int] = Field(
+        default=None,
+        description="Total number of steps"
+    )
+    
+    # Source identification (Agent compatibility)
+    message_type: Optional[str] = Field(
+        default=None,
+        description="Source type (tool name, agent name, etc.)"
+    )
+    message_id: Optional[str] = Field(
+        default=None,
+        description="Source identifier (tool call ID, message ID, etc.)"
+    )
+    
+    # Flow identification (Flow compatibility)
+    flow_id: Optional[str] = Field(
+        default=None,
+        description="Flow instance ID"
+    )
+    node_id: Optional[str] = Field(
+        default=None,
+        description="Node ID that generated this event"
+    )
+    stage: Optional[str] = Field(
+        default=None,
+        description="Flow stage name (e.g., 'strategy', 'speak')"
+    )
+    
+    # Execution path for nested Runnables
+    execution_path: Optional[List[str]] = Field(
+        default=None,
+        description="Path of execution (e.g., ['flow_id', 'node_id', 'sub_flow_id'])"
+    )
+    
+    # Control signal
+    control: Optional[ControlSignal] = Field(
+        default=None,
+        description="Control signal for flow control"
+    )
+    
+    # Additional metadata
+    metadata: Optional[dict] = Field(
+        default=None,
+        description="Additional metadata"
+    )
+    
+    def with_path(self, *path_segments: str) -> "ExecutionEvent":
+        """Create a copy with path segments prepended
+        
+        Args:
+            *path_segments: Path segments to prepend
+            
+        Returns:
+            New ExecutionEvent with updated execution_path
+        """
+        current_path = self.execution_path or []
+        new_path = list(path_segments) + current_path
+        return self.model_copy(update={"execution_path": new_path})
+    
+    def with_flow_info(self, flow_id: str, node_id: Optional[str] = None, stage: Optional[str] = None) -> "ExecutionEvent":
+        """Create a copy with flow information added
+        
+        Args:
+            flow_id: Flow instance ID
+            node_id: Optional node ID
+            stage: Optional stage name
+            
+        Returns:
+            New ExecutionEvent with flow info
+        """
+        updates = {"flow_id": flow_id}
+        if node_id:
+            updates["node_id"] = node_id
+        if stage:
+            updates["stage"] = stage
+        return self.model_copy(update=updates)
+    
+    # =========================================================================
+    # Factory methods
+    # =========================================================================
+    
+    @classmethod
+    def token(cls, content: str, **kwargs) -> "ExecutionEvent":
+        """Create a token event"""
+        return cls(type=ExecutionEventType.TOKEN, content=content, **kwargs)
+    
+    @classmethod
+    def status(cls, content: str, **kwargs) -> "ExecutionEvent":
+        """Create a status event"""
+        return cls(type=ExecutionEventType.STATUS, content=content, **kwargs)
+    
+    @classmethod
+    def error(cls, content: str, **kwargs) -> "ExecutionEvent":
+        """Create an error event"""
+        return cls(type=ExecutionEventType.ERROR, content=content, **kwargs)
+    
+    @classmethod
+    def done(cls, **kwargs) -> "ExecutionEvent":
+        """Create a done event"""
+        return cls(type=ExecutionEventType.DONE, **kwargs)
+    
+    @classmethod
+    def step_event(cls, step: int, total_steps: Optional[int] = None, content: Optional[str] = None, **kwargs) -> "ExecutionEvent":
+        """Create a step event"""
+        return cls(type=ExecutionEventType.STEP, step=step, total_steps=total_steps, content=content, **kwargs)

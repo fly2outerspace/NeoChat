@@ -3,6 +3,7 @@ from typing import List, Optional, Literal, Dict, Any
 
 from pydantic import BaseModel, Field
 
+from app.schema import ExecutionEventType
 from app.utils.enums import InputMode
 
 
@@ -53,7 +54,8 @@ class ChatCompletionRequest(BaseModel):
     stream: bool = Field(default=False, description="Whether to stream the response")
     session_id: str = Field(..., description="Session ID for conversation history (required)")
     character: Optional[CharacterInfo] = Field(None, description="Character information (optional)")
-    model_info: Optional[ModelInfo] = Field(None, description="Model configuration (optional, if not provided, uses default config from config.toml)")
+    chat_modelinfo: Optional[ModelInfo] = Field(None, description="Chat model configuration (optional, for dialogue generation)")
+    infer_modelinfo: Optional[ModelInfo] = Field(None, description="Inference model configuration (optional, for reasoning)")
     participants: Optional[List[str]] = Field(None, description="List of character IDs that messages from this request should be visible to (None means visible to all)")
 
 
@@ -283,12 +285,6 @@ class TimeClockRequest(BaseModel):
     actions: Optional[List[TimeActionModel]] = Field(None, description="Full action chain to apply")
     reset_actions: bool = Field(False, description="Whether to clear existing actions before applying new ones")
     rebase: bool = Field(True, description="Re-anchor base time at current virtual time before applying actions")
-    # Legacy fields for backward compatibility
-    mode: Optional[str] = Field(None, description="[LEGACY] Time mode: 'real', 'offset', 'fixed', or 'scaled'")
-    offset_seconds: Optional[float] = Field(None, description="[LEGACY] Time offset in seconds (for offset mode)")
-    fixed_time: Optional[str] = Field(None, description="[LEGACY] Fixed time point (format: 'YYYY-MM-DD HH:MM:SS')")
-    speed: Optional[float] = Field(None, description="[LEGACY] Time speed multiplier (for scaled mode, 1.0 = normal)")
-    virtual_start: Optional[str] = Field(None, description="[LEGACY] Virtual start time for scaled mode")
 
 
 class TimeSeekRequest(BaseModel):
@@ -327,9 +323,10 @@ class FlowCompletionRequest(BaseModel):
     )
     stream: bool = Field(default=False, description="Whether to stream the response")
     session_id: str = Field(..., description="Session ID for conversation history (required)")
-    flow_type: str = Field(default="chat", description="Type of flow to use (default: 'chat')")
+    flow_type: str = Field(default="chat_parallel", description="Type of flow to use (default: 'chat_parallel')")
     character: Optional[CharacterInfo] = Field(None, description="Character information (optional)")
-    model_info: Optional[ModelInfo] = Field(None, description="Model configuration (optional)")
+    chat_modelinfo: Optional[ModelInfo] = Field(None, description="Chat model configuration (optional, for dialogue generation)")
+    infer_modelinfo: Optional[ModelInfo] = Field(None, description="Inference model configuration (optional, for reasoning)")
     participants: Optional[List[str]] = Field(None, description="List of character IDs that messages from this flow should be visible to (None means visible to all)")
 
 
@@ -426,3 +423,92 @@ class SessionResponse(BaseModel):
 class SessionListResponse(BaseModel):
     """Response model for a list of sessions"""
     sessions: List[SessionResponse] = Field(..., description="List of sessions")
+
+
+# =============================================================================
+# SSE (Server-Sent Events) Data Structures
+# =============================================================================
+
+class SSEToolInfo(BaseModel):
+    """Tool information in SSE events"""
+    name: str = Field(..., description="Tool name")
+    id: str = Field(..., description="Tool call ID")
+
+
+class SSEEvent(BaseModel):
+    """Unified SSE event structure for streaming responses
+    
+    This is a simplified, extensible format replacing the verbose OpenAI format.
+    All SSE data payloads should use this structure.
+    
+    Event Types:
+        - token: Text content chunk (streaming text)
+        - status: Status update (tool execution, flow progress)
+        - done: Stream completed successfully
+        - error: Error occurred
+    
+    Example payloads:
+        Token:  {"type": "token", "content": "Hello"}
+        Status: {"type": "status", "status": "Thinking...", "stage": "strategy"}
+        Tool:   {"type": "token", "content": "result", "tool": {"name": "search", "id": "call_123"}}
+        Done:   {"type": "done"}
+        Error:  {"type": "error", "content": "Something went wrong"}
+    """
+    type: ExecutionEventType = Field(
+        ..., description="Event type"
+    )
+    content: Optional[str] = Field(
+        default=None, description="Text content (for token/error events)"
+    )
+    status: Optional[str] = Field(
+        default=None, description="Status message (for status events)"
+    )
+    tool: Optional[SSEToolInfo] = Field(
+        default=None, description="Tool information (when event is from a tool)"
+    )
+    stage: Optional[str] = Field(
+        default=None, description="Current execution stage (e.g., 'strategy', 'speak')"
+    )
+    node_id: Optional[str] = Field(
+        default=None, description="Flow node ID that generated this event"
+    )
+    
+    def to_sse(self) -> str:
+        """Convert to SSE data line format"""
+        import json
+        data = {
+            "type": self.type,
+        }
+        if self.content is not None:
+            data["content"] = self.content
+        if self.status is not None:
+            data["status"] = self.status
+        if self.tool is not None:
+            data["tool"] = {"name": self.tool.name, "id": self.tool.id}
+        if self.stage is not None:
+            data["stage"] = self.stage
+        if self.node_id is not None:
+            data["node_id"] = self.node_id
+        return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+    
+    @classmethod
+    def create_token(cls, content: str, tool: Optional[SSEToolInfo] = None, 
+                     stage: Optional[str] = None, node_id: Optional[str] = None) -> "SSEEvent":
+        """Create a token event"""
+        return cls(type=ExecutionEventType.TOKEN, content=content, tool=tool, stage=stage, node_id=node_id)
+    
+    @classmethod
+    def create_status(cls, status: str, stage: Optional[str] = None, 
+                      node_id: Optional[str] = None) -> "SSEEvent":
+        """Create a status event"""
+        return cls(type=ExecutionEventType.STATUS, status=status, stage=stage, node_id=node_id)
+    
+    @classmethod
+    def create_done(cls) -> "SSEEvent":
+        """Create a done event"""
+        return cls(type=ExecutionEventType.DONE)
+    
+    @classmethod
+    def create_error(cls, content: str, stage: Optional[str] = None) -> "SSEEvent":
+        """Create an error event"""
+        return cls(type=ExecutionEventType.ERROR, content=content, stage=stage)

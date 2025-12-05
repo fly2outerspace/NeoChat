@@ -5,11 +5,11 @@ from typing import AsyncIterator, List, Optional
 from pydantic import Field
 
 from app.agent.base import BaseAgent
-from app.schema import AgentState, AgentStreamEvent, Message
+from app.logger import logger
+from app.prompt.chat import SYSTEM_PROMPT
+from app.schema import ExecutionEvent, ExecutionEventType, ExecutionState, Message
 from app.utils import get_current_time
 from app.utils.enums import MessageCategory
-from app.prompt.chat import SYSTEM_PROMPT
-from app.logger import logger
 
 
 class ChatAgent(BaseAgent):
@@ -44,7 +44,7 @@ class ChatAgent(BaseAgent):
         messages.extend(self.messages)
         return messages
 
-    async def step_stream(self) -> AsyncIterator[AgentStreamEvent]:
+    async def step_stream(self) -> AsyncIterator[ExecutionEvent]:
         """Execute a single step with streaming events"""
         system_msgs = self.prepare_system_messages()
         messages = self.prepare_messages()
@@ -90,13 +90,13 @@ class ChatAgent(BaseAgent):
             if delta is None:  # Completion signal
                 break
             collected_content.append(delta)
-            yield AgentStreamEvent(
-                type="token",
+            yield ExecutionEvent(
+                type=ExecutionEventType.TOKEN,
                 content=delta,
                 step=self.current_step,
                 total_steps=self.max_steps,
-                message_type=self.message_type,  # Use class variable for message type
-                message_id=message_id,  # Generated unique ID for this streaming session
+                message_type=self.message_type,
+                message_id=message_id,
             )
         
         # Get final response
@@ -119,7 +119,7 @@ class ChatAgent(BaseAgent):
             self.add_assistant_message(full_response, current_time)
             self.result = full_response
             # Mark as finished after one step
-            self.state = AgentState.FINISHED
+            self.state = ExecutionState.FINISHED
         else:
             # No valid response received - mark as error to prevent stuck state
             error_msg = "错误: 未收到有效响应"
@@ -129,10 +129,10 @@ class ChatAgent(BaseAgent):
                 logger.warning(f" {self.name} received empty response from LLM (streaming)")
             
             self.result = ""
-            self.state = AgentState.ERROR
+            self.state = ExecutionState.ERROR
             # Emit error event for frontend
-            yield AgentStreamEvent(
-                type="error",
+            yield ExecutionEvent(
+                type=ExecutionEventType.ERROR,
                 content=error_msg,
                 step=self.current_step,
                 total_steps=self.max_steps,
