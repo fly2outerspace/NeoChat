@@ -10,7 +10,7 @@ import {
   syncSessionsFromDatabase,
 } from '@/lib/sessions';
 
-export type ViewType = 'chat' | 'archive-save' | 'archive-load' | 'system' | 'user' | 'role' | 'model';
+export type ViewType = 'chat' | 'archive-save' | 'archive-load' | 'system' | 'user' | 'role' | 'model' | 'memory' | 'relation';
 
 interface SidebarProps {
   currentView: ViewType;
@@ -28,6 +28,8 @@ export default function Sidebar({ currentView, onViewChange }: SidebarProps) {
     { id: 'user', label: '用户设置', icon: '👤' },
     { id: 'role', label: '角色设置', icon: '🎭' },
     { id: 'model', label: '模型设置', icon: '🤖' },
+    { id: 'memory', label: '记忆', icon: '🧠' },
+    { id: 'relation', label: '关系', icon: '🔗' },
   ];
 
   const handleCreateNewArchive = async () => {

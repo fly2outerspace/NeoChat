@@ -185,12 +185,12 @@ export default function SystemSettings() {
                     ?
                   </div>
                   <div className="absolute left-0 top-6 w-64 p-3 bg-slate-800 border border-slate-600 rounded-md text-xs text-slate-200 shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
-                    Flow 模式为实验性内容，正在开发中
+                    flow模式会在后台处理日程等记忆添加，让对话响应更快
                   </div>
                 </div>
               </div>
               <p className="text-sm text-slate-400">
-                选择使用 Agent 模式（单智能体）或 Flow 模式（多智能体流程，包含策略决策）
+                选择使用 Agent 模式（单智能体）或 Flow 模式（多智能体流程，加速对话过程，后台处理记录记忆和关系网）
               </p>
             </div>
             <div className="w-full md:w-auto flex flex-col gap-2">

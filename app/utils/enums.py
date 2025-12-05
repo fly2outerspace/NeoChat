@@ -74,6 +74,10 @@ class ToolName(str, Enum):
     SCHEDULE_READER = "schedule_reader"
     SCHEDULE_WRITER = "schedule_writer"
     
+    # Event tools
+    EVENT_READER = "event_reader"
+    EVENT_WRITER = "event_writer"
+    
     # Relation tools
     RELATION = "relation"
     
@@ -122,6 +126,10 @@ class MessageType(str, Enum):
     # Schedule tools
     SCHEDULE_READER = "schedule_reader"
     SCHEDULE_WRITER = "schedule_writer"
+    
+    # Event tools
+    EVENT_READER = "event_reader"
+    EVENT_WRITER = "event_writer"
     
     # Relation tools
     RELATION = "relation"

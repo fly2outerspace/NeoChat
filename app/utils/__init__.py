@@ -192,17 +192,18 @@ def remove_empty_lines(text: Optional[str]) -> str:
     Returns:
         Text without empty lines. Returns "" for None/empty input.
     """
-    if not text:
-        return ""
+    return text or ""
+    # if not text:
+    #     return ""
 
-    # Normalize different newline forms
-    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    # # Normalize different newline forms
+    # normalized = text.replace("\r\n", "\n").replace("\r", "\n")
 
-    # Split into lines, drop whitespace-only lines, and join back
-    lines = normalized.split("\n")
-    non_empty_lines = [line for line in lines if line.strip() != ""]
+    # # Split into lines, drop whitespace-only lines, and join back
+    # lines = normalized.split("\n")
+    # non_empty_lines = [line for line in lines if line.strip() != ""]
 
-    return "\n".join(non_empty_lines)
+    # return "\n".join(non_empty_lines)
 
 
 __all__ = [

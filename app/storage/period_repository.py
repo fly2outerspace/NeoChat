@@ -10,6 +10,7 @@ class PeriodRepository(SQLiteBase):
 
     PERIOD_TYPE_SCENARIO = "scenario"
     PERIOD_TYPE_SCHEDULE = "schedule"
+    PERIOD_TYPE_EVENT = "event"
 
     def insert_period(
         self,

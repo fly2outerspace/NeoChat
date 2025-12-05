@@ -4,11 +4,13 @@ from typing import Any, List, Optional, Union
 from pydantic import BaseModel, Field
 
 from app.logger import logger
-from app.schema import Message, QueryMetadata, ScheduleEntry, Scenario, Relation
+from app.schema import Message, QueryMetadata, ScheduleEntry, Scenario, Event, Relation
 from app.storage.meilisearch_service import MeilisearchService
 from app.storage.message_store import MessageStore
+from app.storage.period_repository import PeriodRepository
 from app.storage.schedule_store import ScheduleStore
 from app.storage.scenario_store import ScenarioStore
+from app.storage.event_store import EventStore
 from app.storage.relation_store import RelationStore
 from app.utils import get_current_time, get_current_datetime
 from app.utils.time_provider import time_provider
@@ -474,18 +476,21 @@ class Memory(BaseModel):
             scenario_store = ScenarioStore()
             scenario_store.set_session(session_id)
             
-            # Get scenario from repository
-            row = scenario_store._repository.get_by_scenario_id(scenario_id)
+            # Get period from repository by period_id (scenario_id maps to period_id)
+            row = scenario_store._repository.get_by_period_id(scenario_id)
             
             if not row:
                 return None
             
+            # Verify it's a scenario and belongs to the current session
+            if row.get("period_type") != PeriodRepository.PERIOD_TYPE_SCENARIO:
+                return None
+            
+            if row.get("session_id") != session_id:
+                return None
+            
             # Convert to Scenario object
             scenario = ScenarioStore._rows_to_scenarios([row])[0]
-            
-            # Verify it belongs to the current session
-            if scenario.session_id != session_id:
-                return None
             
             return scenario
         except Exception as e:
@@ -957,6 +962,221 @@ class Memory(BaseModel):
             logger.error(f"Failed to search scenarios by keyword: {e}")
             return []
 
+    # ========== Event Methods ==========
+    
+    def add_event(self, event: Event) -> Event:
+        """Add an event to memory and save to storage
+        
+        Args:
+            event: Event to add. session_id will be set from self.session_id if not provided.
+            
+        Returns:
+            Event with id and session_id set
+            
+        Raises:
+            ValueError: If session_id is not set and event.session_id is not provided
+        """
+        if not self.session_id and not event.session_id:
+            raise ValueError("session_id is required. Set Memory.session_id or provide event.session_id")
+        
+        target_session = self.session_id or event.session_id
+        event.session_id = target_session
+        
+        try:
+            event_store = EventStore()
+            event_store.set_session(target_session)
+            stored_event = event_store.add_event(event, character_id=self.character_id)
+            return stored_event
+        except Exception as e:
+            logger.error(f"Failed to add event to storage: {e}")
+            raise
+
+    @staticmethod
+    def get_events_at(session_id: str, time_point: str, character_id: Optional[str] = None) -> List[Event]:
+        """Get events covering a specific time point
+        
+        Args:
+            session_id: Session ID for querying events
+            time_point: Time point string in format 'YYYY-MM-DD HH:MM:SS'
+            character_id: Optional character ID for filtering
+            
+        Returns:
+            List of Event objects that cover the time point
+            
+        Example:
+            Memory.get_events_at('session_id', '2024-01-15 14:30:00')
+            # Returns events that cover 14:30:00
+        """
+        if not session_id:
+            logger.warning("session_id is required for event queries")
+            return []
+        
+        try:
+            event_store = EventStore()
+            event_store.set_session(session_id)
+            return event_store.find_events_at(time_point, session_id, character_id=character_id)
+        except Exception as e:
+            logger.error(f"Failed to get events at time: {e}")
+            return []
+
+    @staticmethod
+    def get_events_in_range(session_id: str, start_at: str, end_at: str, character_id: Optional[str] = None) -> List[Event]:
+        """Get events that overlap with the given time range
+        
+        Args:
+            session_id: Session ID for querying events
+            start_at: Start time of the query range in format 'YYYY-MM-DD HH:MM:SS'
+            end_at: End time of the query range in format 'YYYY-MM-DD HH:MM:SS'
+            character_id: Optional character ID for filtering
+            
+        Returns:
+            List of Event objects that overlap with the time range
+            
+        Example:
+            Memory.get_events_in_range('session_id', '2024-01-15 10:00:00', '2024-01-15 15:00:00')
+            # Returns events that overlap with the time range
+        """
+        if not session_id:
+            logger.warning("session_id is required for event queries")
+            return []
+        
+        try:
+            event_store = EventStore()
+            event_store.set_session(session_id)
+            return event_store.find_events_in_range(start_at, end_at, session_id, character_id=character_id)
+        except Exception as e:
+            logger.error(f"Failed to get events in range: {e}")
+            return []
+
+    @staticmethod
+    def search_events_by_keyword(
+        session_id: str,
+        keyword: str,
+        limit: int = 50,
+        offset: int = 0,
+        sort: Optional[List[str]] = None,
+        character_id: Optional[str] = None,
+    ) -> List[Event]:
+        """Search events by keyword using Meilisearch
+        
+        Args:
+            session_id: Session ID for querying events
+            keyword: Keyword to search for
+            limit: Maximum number of results to return (default: 50)
+            offset: Offset for pagination (default: 0)
+            sort: Optional sort order (default: ["start_at:asc"])
+            character_id: Optional character ID for filtering
+            
+        Returns:
+            List of Event objects matching the keyword
+            
+        Example:
+            Memory.search_events_by_keyword('session_id', 'meeting', limit=50)
+        """
+        if not session_id:
+            logger.warning("session_id is required for event search")
+            return []
+        
+        try:
+            meilisearch = MeilisearchService()
+            if not meilisearch.is_available:
+                logger.warning("Meilisearch is not available for event search")
+                return []
+            
+            # Build filters
+            filters = ['period_type = "event"']
+            if character_id is not None:
+                filters.append(f'character_id = "{character_id}"')
+            else:
+                filters.append('character_id = null')
+            
+            # Search event entries
+            results = meilisearch.search(
+                query=keyword,
+                session_id=session_id,
+                limit=limit,
+                offset=offset,
+                sort=sort or ["start_at:asc"],
+                index_name=MeilisearchService.PERIOD_INDEX,
+                filters=filters,
+            )
+            
+            # Convert search results to Event objects
+            entries = []
+            for hit in results.get("hits", []):
+                entry = Event(
+                    session_id=hit.get("session_id") or session_id,
+                    event_id=hit.get("period_id"),
+                    start_at=hit.get("start_at") or "",
+                    end_at=hit.get("end_at") or "",
+                    scene=hit.get("content") or "",  # content maps to scene
+                    title=hit.get("title") or "",
+                    created_at=hit.get("created_at"),
+                )
+                entries.append(entry)
+            
+            return entries
+        except Exception as e:
+            logger.error(f"Failed to search events by keyword: {e}")
+            return []
+
+    @staticmethod
+    def update_event_by_event_id(
+        event_id: str,
+        scene: Optional[str] = None,
+        start_at: Optional[str] = None,
+        end_at: Optional[str] = None,
+        title: Optional[str] = None,
+        session_id: Optional[str] = None,
+    ) -> Optional[Event]:
+        """Update event fields by business event_id
+        
+        Args:
+            event_id: Business event_id of the event
+            scene: New scene to set (optional)
+            start_at: New start time to set (optional)
+            end_at: New end time to set (optional)
+            title: New title to set (optional)
+            session_id: Optional session_id for setting store context
+            
+        Returns:
+            Updated Event if successful, None otherwise
+            
+        Example:
+            Memory.update_event_by_event_id("event-123", scene="Updated scene", start_at="2024-01-15 10:00:00", title="New Title", session_id="session_id")
+        """
+        try:
+            event_store = EventStore()
+            if session_id:
+                event_store.set_session(session_id)
+            return event_store.update_event_by_event_id(event_id, scene, start_at, end_at, title)
+        except Exception as e:
+            logger.error(f"Failed to update event: {e}")
+            return None
+
+    @staticmethod
+    def delete_event_by_event_id(event_id: str, session_id: Optional[str] = None) -> bool:
+        """Delete an event by business event_id
+        
+        Args:
+            event_id: Business event_id of the event
+            session_id: Optional session_id for setting store context
+            
+        Returns:
+            True if deletion was successful, False otherwise
+            
+        Example:
+            Memory.delete_event_by_event_id("event-123", "session_id")
+        """
+        try:
+            event_store = EventStore()
+            if session_id:
+                event_store.set_session(session_id)
+            return event_store.delete_event_by_event_id(event_id)
+        except Exception as e:
+            logger.error(f"Failed to delete event: {e}")
+            return False
+
     # ========== Relation Methods ==========
     
     def add_relation(self, relation: Relation) -> Relation:
@@ -1140,3 +1360,45 @@ class Memory(BaseModel):
         except Exception as e:
             logger.error(f"Failed to search relations by keyword: {e}")
             return []
+
+    # ========== Dialogue Turn Counting ==========
+    
+    @staticmethod
+    def count_dialogue_messages(
+        session_id: str,
+        speaker: str,
+        categories: Optional[List[int]] = None
+    ) -> int:
+        """Count dialogue messages by speaker and categories
+        
+        This is an efficient COUNT query for calculating dialogue turns.
+        Used to determine when to trigger periodic tasks (e.g., WriterAgent every 10 turns).
+        
+        Args:
+            session_id: Session ID for querying messages
+            speaker: Speaker name to filter by (e.g., character name)
+            categories: List of category filters (default: [1, 2] for TELEGRAM and SPEAK_IN_PERSON)
+            
+        Returns:
+            Count of matching messages
+            
+        Example:
+            # Count how many times "Seraphina" has spoken via TELEGRAM or SPEAK_IN_PERSON
+            count = Memory.count_dialogue_messages('session_id', 'Seraphina')
+            
+            # Trigger WriterAgent every 10 dialogue turns
+            if count > 0 and count % 10 == 0:
+                # Run WriterAgent
+                pass
+        """
+        if not session_id:
+            logger.warning("session_id is required for dialogue count")
+            return 0
+        
+        try:
+            from app.storage.sqlite_repository import SQLiteMessageRepository
+            repo = SQLiteMessageRepository()
+            return repo.count_dialogue_messages(session_id, speaker, categories)
+        except Exception as e:
+            logger.error(f"Failed to count dialogue messages: {e}")
+            return 0

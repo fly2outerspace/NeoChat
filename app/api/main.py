@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api.routes import chat, search, character, model, time, archive
+from app.api.routes import chat, search, character, model, time, archive, memory
 from app.logger import logger
 from app.config import config
 from app.storage.meilisearch_service import MeilisearchService
@@ -247,6 +247,7 @@ app.include_router(character.router)
 app.include_router(model.router)
 app.include_router(time.router)
 app.include_router(archive.router)
+app.include_router(memory.router)
 from app.api.routes import frontend_messages, sessions
 app.include_router(frontend_messages.router)
 app.include_router(sessions.router)

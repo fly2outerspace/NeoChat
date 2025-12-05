@@ -1,4 +1,4 @@
-"""Tool for reading scenario entries (search by keyword, time point, or time range)"""
+"""Tool for reading scenario entries (search by keyword or scenario_id)"""
 from typing import List, Literal, Optional
 
 from pydantic import Field
@@ -15,13 +15,12 @@ A tool to read and search the detailed scenarios of your memory.
 
 Use this tool to:
 1) search scenarios by a keyword that appears in the scenario content (both Chinese and English keywords are supported),
-2) find scenarios covering a specific time point,
-3) or find scenarios that overlap with a given time range.
+2) or get a specific scenario by its scenario_id.
 """
 
 
 class ScenarioReader(BaseTool):
-    """Tool for reading scenario entries (search by keyword, time point, or time range)"""
+    """Tool for reading scenario entries (search by keyword or scenario_id)"""
 
     name: str = ToolName.SCENARIO_READER
     description: str = _SCENARIO_READER_DESCRIPTION
@@ -31,24 +30,16 @@ class ScenarioReader(BaseTool):
         "properties": {
             "action": {
                 "type": "string",
-                "enum": ["search_by_keyword", "search_by_timepoint", "search_by_time_range"],
-                "description": "Action to perform: 'search_by_keyword' to search scenarios by keyword, 'search_by_timepoint' to find scenarios covering a specific time point, 'search_by_time_range' to find scenarios that overlap with a time range.",
+                "enum": ["search_by_keyword", "search_by_id"],
+                "description": "Action to perform: 'search_by_keyword' to search scenarios by keyword, 'search_by_id' to get a specific scenario by its scenario_id.",
             },
             "keyword": {
                 "type": "string",
                 "description": "Keyword to search for in scenario content. Required when action is 'search_by_keyword'. Supports both Chinese and English keywords.",
             },
-            "time_point": {
+            "scenario_id": {
                 "type": "string",
-                "description": "Time point in format 'YYYY-MM-DD HH:MM:SS' (e.g., '2024-01-15 14:30:00'). Required when action is 'search_by_timepoint'. Returns scenarios that cover this time point (where start_at <= time_point <= end_at).",
-            },
-            "start_at": {
-                "type": "string",
-                "description": "Start time of the query range in format 'YYYY-MM-DD HH:MM:SS' (e.g., '2024-01-15 10:00:00'). Required when action is 'search_by_time_range'.",
-            },
-            "end_at": {
-                "type": "string",
-                "description": "End time of the query range in format 'YYYY-MM-DD HH:MM:SS' (e.g., '2024-01-15 15:00:00'). Required when action is 'search_by_time_range'.",
+                "description": "Scenario ID to search for. Required when action is 'search_by_id'. Returns the scenario with the specified scenario_id if it exists.",
             },
         },
         "required": ["action"],
@@ -81,11 +72,9 @@ class ScenarioReader(BaseTool):
     async def execute(
         self,
         *,
-        action: Literal["search_by_keyword", "search_by_timepoint", "search_by_time_range"],
+        action: Literal["search_by_keyword", "search_by_id"],
         keyword: Optional[str] = None,
-        time_point: Optional[str] = None,
-        start_at: Optional[str] = None,
-        end_at: Optional[str] = None,
+        scenario_id: Optional[str] = None,
         **kwargs,
     ) -> ToolResult:
         """
@@ -94,9 +83,7 @@ class ScenarioReader(BaseTool):
         Args:
             action: Action to perform
             keyword: Search keyword (required for search_by_keyword)
-            time_point: Time point (required for search_by_timepoint)
-            start_at: Start time of range (required for search_by_time_range)
-            end_at: End time of range (required for search_by_time_range)
+            scenario_id: Scenario ID (required for search_by_id)
 
         Returns:
             ToolResult containing formatted result
@@ -128,47 +115,28 @@ class ScenarioReader(BaseTool):
                 
                 return ToolResult(content=formatted_output)
 
-            elif action == "search_by_timepoint":
-                # Find scenario entries covering a specific time point
-                if not time_point:
+            elif action == "search_by_id":
+                # Get a specific scenario by scenario_id
+                if not scenario_id:
                     raise ToolError(
-                        "Parameter 'time_point' is required when action is 'search_by_timepoint'"
+                        "Parameter 'scenario_id' is required when action is 'search_by_id'"
                     )
                 
-                # Use Memory.get_scenarios_at to find scenarios covering the time point
-                entries = Memory.get_scenarios_at(self.session_id, time_point, character_id=self.character_id)
+                # Use Memory.get_scenario_by_scenario_id to get the scenario
+                scenario = Memory.get_scenario_by_scenario_id(scenario_id, self.session_id)
                 
-                # Format results
-                formatted_output = f"Found {len(entries)} scenario entry/entries covering time point '{time_point}':\n\n"
-                if entries:
-                    formatted_output += self._format_scenario_list(entries)
+                # Format result
+                if scenario:
+                    formatted_output = f"Found scenario with scenario_id '{scenario_id}':\n\n"
+                    formatted_output += self._format_scenario_entry(scenario)
                 else:
-                    formatted_output += f"No scenario entries found covering the time point '{time_point}'."
-                
-                return ToolResult(content=formatted_output)
-
-            elif action == "search_by_time_range":
-                # Find scenario entries that overlap with the given time range
-                if not start_at or not end_at:
-                    raise ToolError(
-                        "Parameters 'start_at' and 'end_at' are required when action is 'search_by_time_range'"
-                    )
-                
-                # Use Memory.get_scenarios_in_range to find scenarios overlapping with the range
-                entries = Memory.get_scenarios_in_range(self.session_id, start_at, end_at, character_id=self.character_id)
-                
-                # Format results
-                formatted_output = f"Found {len(entries)} scenario entry/entries overlapping with time range '{start_at}' to '{end_at}':\n\n"
-                if entries:
-                    formatted_output += self._format_scenario_list(entries)
-                else:
-                    formatted_output += f"No scenario entries found overlapping with the time range '{start_at}' to '{end_at}'."
+                    formatted_output = f"No scenario found with scenario_id '{scenario_id}'."
                 
                 return ToolResult(content=formatted_output)
 
             else:
                 raise ToolError(
-                    f"Invalid action: {action}. Must be one of: search_by_keyword, search_by_timepoint, search_by_time_range"
+                    f"Invalid action: {action}. Must be one of: search_by_keyword, search_by_id"
                 )
 
         except ToolError:
