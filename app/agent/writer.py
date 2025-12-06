@@ -177,7 +177,7 @@ class WriterAgent(ToolCallAgent):
                 {
                     "start_at": sc.start_at,
                     "end_at": sc.end_at,
-                    "text": (getattr(sc, "title", "") or sc.content or "") + f"(ID:{sc.scenario_id})",
+                    "text": (getattr(sc, "title", "")) + f"(ID:{sc.scenario_id})(content:{sc.content})",
                 }
             )
 

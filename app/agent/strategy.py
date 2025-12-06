@@ -117,8 +117,6 @@ class StrategyAgent(ToolCallAgent):
         """Prepare system messages for the agent"""
         current_time = get_current_time(session_id=self.session_id)
         long_term_memory, relationship = self.prepare_memory_content()
-        logger.info(f"{self.name}'s long_term_memory: \n{long_term_memory}")
-        logger.info(f"{self.name}'s relationship: \n{relationship}")
         system_prompt = self.system_prompt.format(
             roleplay_prompt=self.roleplay_prompt,
             long_term_memory=long_term_memory, 

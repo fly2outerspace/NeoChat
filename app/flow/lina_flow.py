@@ -197,7 +197,7 @@ class LinaFlow(SequentialFlow):
             )
             
             # Trigger WriterAgent every 5 dialogue turns
-            should_run_writer = dialogue_count > 0 and dialogue_count % 5 == 0
+            should_run_writer = dialogue_count > 0 and dialogue_count % 3 == 0
             
             if should_run_writer:
                 logger.info(f" {self.name} dialogue count={dialogue_count}, triggering WriterAgent")
