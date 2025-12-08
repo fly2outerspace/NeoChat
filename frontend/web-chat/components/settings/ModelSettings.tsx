@@ -605,7 +605,7 @@ export default function ModelSettings() {
 
 
       {/* 模型设置区域 */}
-      <div className="bg-slate-950 border border-slate-700 rounded-lg overflow-hidden">
+      <div className="panel overflow-hidden">
         <div className="flex" style={{ height: 'calc(100vh - 200px)', minHeight: '600px' }}>
           {/* 左侧侧边栏 */}
           <div className="w-64 border-r border-slate-700 flex flex-col">
@@ -1031,7 +1031,7 @@ export default function ModelSettings() {
       </div>
 
       {/* 进阶设置 */}
-      <div className="mt-6 bg-slate-950 border border-slate-700 rounded-lg overflow-hidden">
+      <div className="mt-6 panel overflow-hidden">
         <button
           onClick={() => setAdvancedSettingsOpen(!advancedSettingsOpen)}
           className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-slate-900 transition-colors"

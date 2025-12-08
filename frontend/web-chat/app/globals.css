@@ -162,3 +162,34 @@ body {
 .chat-messages-area {
   scrollbar-color: #ff0066 rgba(0, 0, 0, 0.3) !important;
 }
+
+/* Shared panel styles to unify dark glassmorphism cards */
+.panel {
+  background: linear-gradient(180deg, #0b1220 0%, #0a1020 100%);
+  border: 1px solid #1f2937;
+  border-radius: 12px;
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(148, 163, 184, 0.08);
+  backdrop-filter: blur(4px);
+}
+
+.panel-soft {
+  background: linear-gradient(180deg, #0f172a 0%, #0b1220 100%);
+  border: 1px solid #1f2937;
+  border-radius: 12px;
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.25),
+    0 0 0 1px rgba(148, 163, 184, 0.06);
+  backdrop-filter: blur(4px);
+}
+
+.panel-danger {
+  background: linear-gradient(180deg, #1a0f12 0%, #12090d 100%);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  border-radius: 12px;
+  box-shadow:
+    0 12px 30px rgba(127, 29, 29, 0.2),
+    0 0 0 1px rgba(248, 113, 113, 0.2);
+  backdrop-filter: blur(4px);
+}

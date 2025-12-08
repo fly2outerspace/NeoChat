@@ -19,12 +19,29 @@ export default function ArchiveManager() {
   const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
+    // 首次挂载时加载数据
     loadArchives();
+
+    // 监听页面切换事件（切换到存档页面时刷新）
+    const handleViewSwitched = (event: CustomEvent) => {
+      if (event.detail === 'archive-save') {
+        // 切换到存档页面时静默刷新，不显示 loading，避免闪烁
+        loadArchives(false);
+      }
+    };
+
+    window.addEventListener('viewSwitched', handleViewSwitched as EventListener);
+
+    return () => {
+      window.removeEventListener('viewSwitched', handleViewSwitched as EventListener);
+    };
   }, []);
 
-  const loadArchives = async () => {
+  const loadArchives = async (showLoading: boolean = true) => {
     try {
+      if (showLoading) {
       setLoading(true);
+      }
       setError(null);
       const data: ArchiveListResponse = await listArchives();
       setArchives(data.archives);
@@ -32,7 +49,9 @@ export default function ArchiveManager() {
       setError(err.message || '加载存档列表失败');
       console.error('Failed to load archives:', err);
     } finally {
+      if (showLoading) {
       setLoading(false);
+      }
     }
   };
 
@@ -124,7 +143,7 @@ export default function ArchiveManager() {
           )}
 
           {/* 创建新存档 */}
-          <div className="bg-slate-950 border border-slate-700 rounded-lg p-6 mb-6">
+          <div className="panel p-6 mb-6">
             <h3 className="text-lg font-medium mb-4">创建新存档（当前数据库的副本）</h3>
             <p className="text-sm text-slate-400 mb-4">创建的新存档将包含当前数据库的所有内容</p>
             <div className="flex gap-3">
@@ -151,8 +170,8 @@ export default function ArchiveManager() {
           </div>
 
           {/* 存档列表 */}
-          <div className="bg-slate-950 border border-slate-700 rounded-lg overflow-hidden">
-            <div className="p-4 border-b border-slate-700">
+          <div className="panel overflow-hidden">
+            <div className="p-4 border-b border-slate-800/80">
               <h3 className="text-lg font-medium">存档列表</h3>
             </div>
             {loading ? (

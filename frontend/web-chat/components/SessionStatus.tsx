@@ -199,26 +199,26 @@ export default function SessionStatus({ sessionId }: SessionStatusProps) {
 
 
   return (
-    <div className="h-full flex flex-col bg-slate-950 border-l border-slate-700 p-4">
-      <div className="text-sm font-semibold text-slate-300 mb-4">会话状态</div>
+    <div className="h-full flex flex-col bg-gradient-to-b from-[#0b1220] to-[#0a1020] border-l border-slate-800/80 p-4 shadow-inner">
+      <div className="text-sm font-semibold text-slate-200 mb-4">会话状态</div>
       
       {sessionId ? (
         <div className="space-y-4">
           <div>
             <div className="text-xs text-slate-500 mb-1">会话 ID</div>
-            <div className="text-xs text-slate-400 font-mono break-all">
+            <div className="text-xs text-slate-300 font-mono break-all">
               {sessionId}
             </div>
           </div>
           
           {/* 虚拟时钟 */}
-          <div className="border border-slate-800 rounded-lg p-3 bg-slate-900/40">
+          <div className="border border-slate-800/80 rounded-xl p-4 bg-slate-900/70 shadow-lg shadow-slate-900/40 backdrop-blur">
             <div className="flex items-center justify-between mb-2">
               <div className="text-xs text-slate-500">虚拟时间</div>
               <button
                 onClick={loadClock}
                 disabled={clockLoading || clockActionLoading}
-                className="text-xs text-slate-400 hover:text-sky-400 disabled:opacity-40"
+                className="text-xs px-2 py-1 rounded-md bg-slate-800 border border-slate-700 text-slate-200 hover:border-sky-500 hover:text-sky-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 {clockLoading ? '同步中...' : '同步'}
               </button>
@@ -258,12 +258,12 @@ export default function SessionStatus({ sessionId }: SessionStatusProps) {
                 <div className="mt-3">
                   <button
                     onClick={() => setTimelineExpanded((v) => !v)}
-                    className="text-xs text-slate-400 hover:text-sky-400"
+                    className="text-xs text-slate-400 hover:text-sky-300"
                   >
                     {timelineExpanded ? '收起设置' : '展开设置'}
                   </button>
                   {timelineExpanded && (
-                    <div className="mt-3 space-y-4 text-slate-200 border border-slate-800 rounded-lg p-4 text-[13px]">
+                    <div className="mt-3 space-y-4 text-slate-200 border border-slate-800 rounded-xl p-4 text-[13px] bg-slate-900/80 shadow-inner shadow-slate-900/50">
                       <div>
                         <div className="text-[11px] text-slate-500 mb-1">偏移</div>
                         {/* 分钟级别 */}
@@ -273,7 +273,7 @@ export default function SessionStatus({ sessionId }: SessionStatusProps) {
                               key={delta}
                               onClick={() => handleNudge(delta)}
                               disabled={clockActionLoading}
-                              className="text-xs px-2 py-1 rounded border border-slate-700 text-slate-200 hover:border-sky-400 disabled:opacity-40"
+                              className="text-xs px-2 py-1 rounded-md border border-slate-700 bg-slate-800/70 text-slate-200 hover:border-sky-500 hover:text-sky-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                             >
                               {delta > 0 ? `+${delta / 60}m` : `${delta / 60}m`}
                             </button>
@@ -286,7 +286,7 @@ export default function SessionStatus({ sessionId }: SessionStatusProps) {
                               key={delta}
                               onClick={() => handleNudge(delta)}
                               disabled={clockActionLoading}
-                              className="text-xs px-2 py-1 rounded border border-slate-700 text-slate-200 hover:border-sky-400 disabled:opacity-40"
+                              className="text-xs px-2 py-1 rounded-md border border-slate-700 bg-slate-800/70 text-slate-200 hover:border-sky-500 hover:text-sky-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                             >
                               {delta > 0 ? `+${delta / 3600}h` : `${delta / 3600}h`}
                             </button>
@@ -302,7 +302,7 @@ export default function SessionStatus({ sessionId }: SessionStatusProps) {
                               key={speed}
                               onClick={() => handleSpeed(speed)}
                               disabled={clockActionLoading}
-                              className="text-xs px-2 py-1 rounded border border-slate-700 text-slate-200 hover:border-sky-400 disabled:opacity-40"
+                              className="text-xs px-2 py-1 rounded-md border border-slate-700 bg-slate-800/70 text-slate-200 hover:border-sky-500 hover:text-sky-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                             >
                               {speed === 0 ? '暂停' : `${speed}x`}
                             </button>
@@ -313,7 +313,7 @@ export default function SessionStatus({ sessionId }: SessionStatusProps) {
                       <button
                         onClick={handleResetReal}
                         disabled={clockActionLoading}
-                        className="w-full text-xs px-2 py-1 rounded border border-red-500 text-red-300 hover:bg-red-500/10 disabled:opacity-40"
+                        className="w-full text-xs px-2 py-1 rounded-md border border-rose-500 text-rose-200 bg-rose-900/40 hover:bg-rose-800/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                       >
                         恢复真实时间
                       </button>
@@ -330,7 +330,7 @@ export default function SessionStatus({ sessionId }: SessionStatusProps) {
                                 value={timelineParts[field]}
                                 onChange={(e) => handleTimelinePartChange(field, e.target.value)}
                                 placeholder={field === 'year' ? 'YYYY' : 'MM'}
-                                className="px-2 py-1 bg-slate-900 border border-slate-700 rounded text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                                className="px-2 py-1 bg-slate-900/90 border border-slate-700 rounded-md text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
                               />
                             </div>
                           ))}
@@ -345,7 +345,7 @@ export default function SessionStatus({ sessionId }: SessionStatusProps) {
                                 value={timelineParts[field]}
                                 onChange={(e) => handleTimelinePartChange(field, e.target.value)}
                                 placeholder="00"
-                                className="px-2 py-1 bg-slate-900 border border-slate-700 rounded text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                                className="px-2 py-1 bg-slate-900/90 border border-slate-700 rounded-md text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
                               />
                             </div>
                           ))}
@@ -353,7 +353,7 @@ export default function SessionStatus({ sessionId }: SessionStatusProps) {
                         <button
                           onClick={handleTimelineSubmit}
                           disabled={clockActionLoading}
-                          className="w-full mt-2 px-2 py-1 rounded bg-sky-600 text-white text-xs hover:bg-sky-500 disabled:opacity-40"
+                          className="w-full mt-2 px-2 py-2 rounded-md bg-sky-600 text-white text-xs hover:bg-sky-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >
                           应用时间线
                         </button>
@@ -372,10 +372,10 @@ export default function SessionStatus({ sessionId }: SessionStatusProps) {
       )}
       
       {/* Tips 提示 */}
-      <div className="mt-auto pt-4 border-t border-slate-800">
+      <div className="mt-auto pt-4 border-t border-slate-800/80">
         <div className="text-xs text-slate-500 leading-relaxed">
-          <span className="text-slate-400 font-medium">tips：</span>
-          可以使用<code className="px-1 py-0.5 bg-slate-800 rounded text-slate-300">跳过</code>和<code className="px-1 py-0.5 bg-slate-800 rounded text-slate-300">目标选择</code>来进行灵活地多人/替身对话
+          <span className="text-slate-300 font-medium">tips：</span>
+          可以使用<code className="px-1 py-0.5 bg-slate-800 rounded text-slate-200">跳过</code>和<code className="px-1 py-0.5 bg-slate-800 rounded text-slate-200">目标选择</code>来进行灵活地多人/替身对话
         </div>
       </div>
     </div>

@@ -1,11 +1,16 @@
 import type { NextConfig } from "next";
 
+const isProd = process.env.NODE_ENV === 'production';
+
 const nextConfig: NextConfig = {
-  // Only enable static export in production build, not in dev mode
-  ...(process.env.NODE_ENV === 'production' ? {
+  // 静态导出配置（仅生产）
+  ...(isProd ? {
     output: 'export',
     distDir: 'out',
     trailingSlash: true,
+    // 关键：使用相对资源路径，确保 file:// 下可以正确加载
+    assetPrefix: './',
+    basePath: '',
   } : {}),
   
   // Disable image optimization (not supported in static export)
