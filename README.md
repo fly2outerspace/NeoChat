@@ -1,47 +1,70 @@
+<div align="center">
+
 # NeoChat
 
-| NeoChat 是一个全栈项目，用于汇集验证个人关于REALTIME LLM CHAT的想法。
+**让任何想象的角色扮演场景实现，在任何切入点继续创造。**
 
-本项目竭尽所能来实现一件事：
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/fly2outerspace/NeoChat/releases)
+[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
 
-**让任何想象的角色扮演场景实现，在任何切入点继续想象与创造。**
+[English](#) | 中文
 
-![对话](assets/sample.png)
+一个基于本地客户端的实时角色扮演聊天系统，支持多人对话、虚拟时间线、角色记忆管理等丰富功能。
 
-## 特点 Features
-玩家可以通过管理发言对象、参与者来控制多人对话，营造家庭聚餐，暗地里的密谋或是会议。
+[快速开始](#开始游玩) • [功能特性](#-核心功能) • [开发文档](#开发环境设置-for-developers) • [问题反馈](https://github.com/fly2outerspace/NeoChat/issues)
+
+![对话示例](assets/sample.png)
+
+</div>
+
+---
+
+## ✨ 核心功能
+
+### 🎭 多人对话系统
+通过管理发言对象和参与者，轻松营造家庭聚餐、密谋会议等各种多人对话场景。
 
 ![多人对话](assets/multi-npc.png)
 
----
-NeoChat基于一个可以自定义的虚拟时间线实现，鼓励NPC在一个动态的时间线上规划和记录自己的生活。
+### ⏰ 虚拟时间线
+基于可自定义的虚拟时间线实现，NPC 可以在动态时间线上自主规划和记录生活。
 
-NPC自觉管理的日程和人际关系
+### 📅 自主日程与关系管理
+NPC 能够自觉管理自己的日程安排和人际关系网络。
 
 ![管理日程和人际关系](assets/memory_relations.png)
 
-角色记忆
+### 🧠 长期记忆系统
+- **角色记忆**：持久化的角色记忆系统，让 NPC 记住重要事件和对话
+- **关系网络**：可视化的角色关系网络，追踪角色间的复杂关系
+
 ![长期记忆](assets/memory.png)
+![关系网络](assets/relation.png)
 
-角色关系网
-![长期记忆](assets/relation.png)
+### 📱 远程对话模拟
+支持模拟远程对话场景，让角色在不同地点进行交流。
 
-模拟远程对话
 ![远程对话](assets/remotechat.png)
 
-管理存档
+### 💾 存档管理
+灵活的多存档管理系统，支持创建、切换和管理多个游戏存档。
 
 ![管理存档](assets/manage_saving.png)
 
-编辑众多角色并保存
+### 👥 角色编辑器
+强大的角色卡编辑系统，支持创建和保存多个自定义角色。
 
 ![角色卡编辑](assets/manage_npcs.png)
 
-设置你的代理人，让它代替你自动说话
+### 🤖 智能代理
+设置你的 AI 代理人，让它代替你自动参与对话。
 
 ![用户设置](assets/set_your_agent.png)
 
-配置你的模型
+### ⚙️ 模型配置
+灵活的大语言模型配置系统，支持多种模型接入。
 
 ![配置模型](assets/modelsetting.png)
 
@@ -54,8 +77,6 @@ NPC自觉管理的日程和人际关系
 ### 启动程序
 
 双击 `NeoChat.exe` 即可启动！
-
-程序启动后，打开浏览器访问 **http://localhost:8000** 进入聊天界面。
 
 前往模型配置界面，配置模型
 
