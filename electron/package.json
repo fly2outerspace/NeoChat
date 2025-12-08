@@ -1,0 +1,69 @@
+{
+  "name": "neochat-shell",
+  "private": true,
+  "version": "0.1.0",
+  "main": "main.js",
+  "scripts": {
+    "dev": "electron .",
+    "build-renderer": "cd ../frontend/web-chat && npm install && npm run build && npm run export",
+    "start-dev-renderer": "cd ../frontend/web-chat && npm install && npm run dev",
+    "dist": "npm run build-renderer && electron-builder",
+    "dist:win": "npm run build-renderer && electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "dependencies": {
+    "iconv-lite": "^0.6.3",
+    "tree-kill": "^1.2.2"
+  },
+  "build": {
+    "appId": "com.neochat.app",
+    "productName": "NeoChat",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json",
+      {
+        "from": "../frontend/web-chat/out",
+        "to": "frontend/web-chat/out"
+      }
+    ],
+    "extraResources": [
+      {
+        "from": "backend",
+        "to": "backend",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../frontend/web-chat/out",
+        "to": "frontend"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "NeoChat"
+    }
+  }
+}

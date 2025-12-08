@@ -1,18 +1,10 @@
 'use client';
 
 import { useEffect } from "react";
-import { Geist, Geist_Mono } from "next/font/google";
+import { App, ConfigProvider } from "antd";
+import { antdThemeConfig } from "@/lib/antdTheme";
+import "antd/dist/reset.css";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export default function RootLayout({
   children,
@@ -39,10 +31,12 @@ export default function RootLayout({
         <title>NeoChat - AI Agent Frontend</title>
         <meta name="description" content="NeoChat frontend interface for AI agent conversations" />
       </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className="antialiased">
+        <ConfigProvider theme={antdThemeConfig}>
+          <App>
         {children}
+          </App>
+        </ConfigProvider>
       </body>
     </html>
   );

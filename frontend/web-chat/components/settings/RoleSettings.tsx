@@ -465,7 +465,7 @@ export default function RoleSettings() {
       )}
 
       {/* 角色设置区域 */}
-      <div className="bg-slate-950 border border-slate-700 rounded-lg overflow-hidden">
+      <div className="panel overflow-hidden">
         <div className="flex" style={{ height: 'calc(100vh - 200px)', minHeight: '600px' }}>
           {/* 左侧侧边栏 */}
           <div className="w-64 border-r border-slate-700 flex flex-col">

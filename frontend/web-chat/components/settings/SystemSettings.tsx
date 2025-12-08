@@ -149,7 +149,7 @@ export default function SystemSettings() {
 
       <div className="space-y-6">
         {/* 主题配色 */}
-        <div className="bg-slate-950 border border-slate-700 rounded-lg p-6">
+        <div className="panel p-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex-1">
               <h3 className="text-lg font-medium mb-1">聊天配色方案</h3>
@@ -175,7 +175,7 @@ export default function SystemSettings() {
         </div>
 
         {/* 聊天模式设置 */}
-        <div className="bg-slate-950 border border-slate-700 rounded-lg p-6">
+        <div className="panel p-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
@@ -208,7 +208,7 @@ export default function SystemSettings() {
         </div>
 
         {/* 沉浸模式设置 */}
-        <div className="bg-slate-950 border border-slate-700 rounded-lg p-6">
+        <div className="panel p-6">
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <h3 className="text-lg font-medium mb-1">沉浸模式</h3>
@@ -239,7 +239,7 @@ export default function SystemSettings() {
         </div>
 
         {/* 内心想法设置 */}
-        <div className="bg-slate-950 border border-slate-700 rounded-lg p-6">
+        <div className="panel p-6">
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <h3 className="text-lg font-medium mb-1">内心想法</h3>
@@ -270,7 +270,7 @@ export default function SystemSettings() {
         </div>
 
         {/* 流式输出设置 */}
-        <div className="bg-slate-950 border border-slate-700 rounded-lg p-6">
+        <div className="panel p-6">
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <h3 className="text-lg font-medium mb-1">流式输出</h3>
@@ -301,7 +301,7 @@ export default function SystemSettings() {
         </div>
 
         {/* 清空本地存储 */}
-        <div className="bg-slate-950 border border-red-700/50 rounded-lg p-6">
+        <div className="panel-danger p-6">
           <div className="flex flex-col gap-4">
             <div className="flex-1">
               <h3 className="text-lg font-medium mb-1 text-red-400">清空本地存储</h3>

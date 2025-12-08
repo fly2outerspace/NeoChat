@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { App } from 'antd';
+import { UserOutlined, IdcardOutlined } from '@ant-design/icons';
 import { getConfig, getUserAvatar, getStreamingEnabled, getThemeSetting, getChatMode, saveChatMode, getImmersiveMode, getInnerThoughtEnabled, type ThemeId, type ChatMode } from '@/lib/config';
 import { getSessionMessages, saveSessionMessages, createSession, setCurrentSessionId, getAllSessions, primeClientMessageCache, type Message, type ToolOutput } from '@/lib/sessions';
 import { InputMode, INPUT_MODE_OPTIONS, getDefaultInputMode, InputModeCategory, getInputModesByCategory, getInputModeConfig } from '@/lib/enums';
@@ -133,6 +135,7 @@ function splitMessageIntoBubbles(
 }
 
 export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps) {
+  const { modal } = App.useApp();
   const [messages, setMessages] = useState<Message[]>([]);
   // Persist input to localStorage with session-specific key
   const inputKey = sessionId ? `chat_input_${sessionId}` : 'chat_input_default';
@@ -751,12 +754,37 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
     if (!isSkip && (!input.trim() || !sessionId || loading)) return;
     if (isSkip && (!sessionId || loading)) return;
 
+    // 检查是否选择了角色（系统指令模式除外）
+    const messageInputMode = isSkip ? InputMode.SKIP : inputMode;
+    const isCommandMode = messageInputMode === InputMode.COMMAND;
+    
+    if (!isSkip && !isCommandMode && !selectedCharacter && !targetCharacterId) {
+      // 未选择角色，弹窗提醒
+      modal.warning({
+        title: '请先选择角色',
+        icon: <IdcardOutlined />,
+        content: (
+          <div>
+            <p>发送消息前需要先选择一个角色。</p>
+            <p>请前往左侧菜单的 <strong>角色设置</strong> 页面创建或选择一个角色。</p>
+          </div>
+        ),
+        okText: '前往角色设置',
+        onOk: () => {
+          // 触发切换到角色设置页面
+          window.dispatchEvent(new CustomEvent('switchToView', { detail: 'role' }));
+        },
+        centered: true,
+      });
+      return; // 不发送请求
+    }
+
     const config = getConfig();
     const currentSessionId = sessionId!; // Already checked above
     
     // Prepare user message
     const userInput = isSkip ? 'skip' : input.trim();
-    const messageInputMode = isSkip ? InputMode.SKIP : inputMode;
+    // messageInputMode 和 isCommandMode 已在上面定义，直接复用
     // Generate stable client_message_id for user message based on session and message index
     // Use messages.length as index to ensure stable ID (won't change on re-save)
     const userMessageId = `user_${currentSessionId}_${messages.length}`;
@@ -793,8 +821,9 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
 
     setLoading(true);
     setError(null);
-    setIsWaitingResponse(true); // 显示等待动画
-    setToolStatus('回复中...'); // 重置工具状态
+    // 系统指令不展示等待占位/回复动画（isCommandMode 已在上面定义）
+    setIsWaitingResponse(!isCommandMode); // 非指令模式才显示等待动画
+    setToolStatus(isCommandMode ? '' : '回复中...'); // 指令模式不展示工具状态
 
     const controller = new AbortController();
     controllerRef.current = controller;
@@ -802,7 +831,7 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
     try {
       // 根据设置决定是否使用流式输出
       {
-        const showLiveUpdates = streamingEnabled;
+        const showLiveUpdates = streamingEnabled && !isCommandMode;
         let streamedContent = '';
         let finalContentBuffer = '';
         let hasAddedPlaceholder = false; // 标记是否已添加占位消息
@@ -1134,6 +1163,10 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
             });
           }
         } else {
+          // 非流式：仅在非系统指令模式下生成助手消息
+          if (isCommandMode) {
+            return;
+          }
           const assistantMessage: Message = {
             role: 'assistant',
             content: finalContent,
@@ -1547,13 +1580,13 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
       </div>
 
       {/* 输入区域 */}
-      <div className={`relative border-t p-4 transition-colors duration-200 ${
+      <div className={`relative border-t p-4 rounded-t-xl shadow-[0_-12px_30px_rgba(0,0,0,0.35)] transition-colors duration-200 ${
         isExtendedMode 
-          ? 'bg-rose-300/20 border-rose-400/30' 
-          : 'bg-slate-950 border-slate-700'
+          ? 'bg-gradient-to-b from-[#1a0f1a]/90 to-[#120a12]/90 border-rose-500/40' 
+          : 'bg-gradient-to-b from-[#0b1220]/95 to-[#0a1020]/95 border-slate-800/80'
       }`}>
-        {/* 浮动书签 - 位于输入框上方 */}
-        <div className="absolute -top-8 left-4 right-4 pointer-events-none z-10">
+        {/* 浮动书签 - 紧贴输入框左右边缘 */}
+        <div className="absolute -top-7 inset-x-4 pointer-events-none z-10">
           <div className="flex items-end justify-between gap-2 pointer-events-auto">
             {/* 左侧书签 - 基础输入模式 */}
             <div className="inline-flex items-end gap-2 pointer-events-auto">
@@ -1591,7 +1624,9 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
                   ? 'border-rose-500/50 bg-rose-900/40'
                   : 'border-rose-400/50 bg-rose-200/20'
               }`}>
-                {getInputModesByCategory(InputModeCategory.EXTENDED).map((mode) => {
+                {getInputModesByCategory(InputModeCategory.EXTENDED)
+                  .filter((mode) => mode.available)
+                  .map((mode) => {
                   const isActive = mode.key === inputMode;
                   return (
                     <button
@@ -1619,10 +1654,10 @@ export default function ChatArea({ sessionId, onSessionCreated }: ChatAreaProps)
         </div>
         <div className="flex flex-col gap-3">
           <textarea
-            className={`w-full resize-none rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 text-slate-50 disabled:cursor-not-allowed disabled:opacity-60 transition-colors duration-200 ${
+            className={`w-full resize-none rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 text-slate-50 disabled:cursor-not-allowed disabled:opacity-60 transition-colors duration-200 shadow-inner ${
               isExtendedMode
-                ? 'bg-rose-200/30 border border-rose-400/50 focus:ring-rose-500'
-                : 'bg-slate-900 border border-slate-700 focus:ring-sky-500'
+                ? 'bg-[#1a0f1a]/75 border border-rose-500/40 focus:ring-rose-500 focus:border-rose-500'
+                : 'bg-slate-900/80 border border-slate-700 focus:ring-sky-500 focus:border-sky-500'
             }`}
             rows={3}
             placeholder={inputPlaceholder}

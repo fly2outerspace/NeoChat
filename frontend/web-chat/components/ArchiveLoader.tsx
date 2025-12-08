@@ -24,12 +24,29 @@ export default function ArchiveLoader() {
   const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
+    // 首次挂载时加载数据
     loadArchives();
+
+    // 监听页面切换事件（切换到加载页面时刷新）
+    const handleViewSwitched = (event: CustomEvent) => {
+      if (event.detail === 'archive-load') {
+        // 切换到加载页面时静默刷新，不显示 loading，避免闪烁
+        loadArchives(false);
+      }
+    };
+
+    window.addEventListener('viewSwitched', handleViewSwitched as EventListener);
+
+    return () => {
+      window.removeEventListener('viewSwitched', handleViewSwitched as EventListener);
+    };
   }, []);
 
-  const loadArchives = async () => {
+  const loadArchives = async (showLoading: boolean = true) => {
     try {
+      if (showLoading) {
       setLoading(true);
+      }
       setError(null);
       const data: ArchiveListResponse = await listArchives();
       setArchives(data.archives);
@@ -37,7 +54,9 @@ export default function ArchiveLoader() {
       setError(err.message || '加载存档列表失败');
       console.error('Failed to load archives:', err);
     } finally {
+      if (showLoading) {
       setLoading(false);
+      }
     }
   };
 
@@ -146,8 +165,8 @@ export default function ArchiveLoader() {
           )}
 
           {/* 存档列表 */}
-          <div className="bg-slate-950 border border-slate-700 rounded-lg overflow-hidden">
-            <div className="p-4 border-b border-slate-700">
+          <div className="panel overflow-hidden">
+            <div className="p-4 border-b border-slate-800/80">
               <h3 className="text-lg font-medium">可用存档</h3>
             </div>
             {loading ? (

@@ -12,6 +12,7 @@ import RoleSettings from '@/components/settings/RoleSettings';
 import ModelSettings from '@/components/settings/ModelSettings';
 import MemoryView from '@/components/MemoryView';
 import RelationView from '@/components/RelationView';
+import TerminalView from '@/components/TerminalView';
 import { getCurrentSessionId, getAllSessions } from '@/lib/sessions';
 
 export default function HomePage() {
@@ -54,11 +55,26 @@ export default function HomePage() {
     setCurrentView(view);
   };
 
+  // 监听外部切换视图事件（用于从其他组件触发视图切换）
+  useEffect(() => {
+    const handleSwitchToView = (event: CustomEvent) => {
+      const targetView = event.detail as ViewType;
+      if (targetView) {
+        setCurrentView(targetView);
+      }
+    };
+
+    window.addEventListener('switchToView', handleSwitchToView as EventListener);
+    return () => {
+      window.removeEventListener('switchToView', handleSwitchToView as EventListener);
+    };
+  }, []);
+
   const handleSessionCreated = (sessionId: string) => {
     setCurrentSessionId(sessionId);
   };
 
-  // 监听页面切换，当切换到记忆或关系页面时触发刷新事件
+  // 监听页面切换，当切换到特定页面时触发刷新事件
   useEffect(() => {
     if (currentView === 'memory') {
       // 延迟一小段时间，确保组件已经渲染
@@ -69,7 +85,16 @@ export default function HomePage() {
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent('viewSwitched', { detail: 'relation' }));
       }, 50);
+    } else if (currentView === 'archive-save') {
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('viewSwitched', { detail: 'archive-save' }));
+      }, 50);
+    } else if (currentView === 'archive-load') {
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('viewSwitched', { detail: 'archive-load' }));
+      }, 50);
     }
+    // 终端视图无需额外事件
   }, [currentView]);
 
   return (
@@ -132,6 +157,13 @@ export default function HomePage() {
         {/* Relation View - 始终挂载 */}
         <div className={currentView === 'relation' ? 'h-full' : 'hidden'}>
           <RelationView />
+        </div>
+
+        {/* Terminal View - 日志输出 */}
+        <div className={currentView === 'terminal' ? 'h-full overflow-y-auto p-4' : 'hidden'}>
+          <div className="max-w-5xl mx-auto h-full">
+            <TerminalView />
+          </div>
         </div>
       </div>
 

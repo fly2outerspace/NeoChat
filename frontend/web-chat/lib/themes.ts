@@ -24,8 +24,6 @@ export interface ChatTheme {
     [InputMode.INNER_VOICE]: string;
     [InputMode.COMMAND]: string;
     [InputMode.SKIP]?: string; // Skip mode doesn't create bubbles, but included for type safety
-    [InputMode.NEW_MODE_2]?: string;
-    [InputMode.NEW_MODE_3]?: string;
     default: string;
   };
   assistantBubbles: {

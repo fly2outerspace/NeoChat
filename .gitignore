@@ -170,3 +170,12 @@ scripts/
 tests/
 docs/
 save/
+
+# Electron
+electron/node_modules/
+electron/dist/
+electron/backend/
+electron/meilisearch/
+electron/*.log
+# Keep electron/package-lock.json (useful for reproducible builds)
+# Keep electron/build/ (may contain icons and resources)

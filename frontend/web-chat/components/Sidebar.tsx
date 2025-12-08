@@ -1,6 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { App, Button, Layout, Menu, Space, Typography } from 'antd';
+import {
+  MessageOutlined,
+  SaveOutlined,
+  FolderOpenOutlined,
+  SettingOutlined,
+  UserOutlined,
+  IdcardOutlined,
+  RobotOutlined,
+  DatabaseOutlined,
+  ClusterOutlined,
+  ThunderboltOutlined,
+  PlusOutlined,
+} from '@ant-design/icons';
 import { createEmptyArchiveAuto } from '@/lib/api/archive';
 import { 
   getAllSessions, 
@@ -10,7 +24,7 @@ import {
   syncSessionsFromDatabase,
 } from '@/lib/sessions';
 
-export type ViewType = 'chat' | 'archive-save' | 'archive-load' | 'system' | 'user' | 'role' | 'model' | 'memory' | 'relation';
+export type ViewType = 'chat' | 'archive-save' | 'archive-load' | 'system' | 'user' | 'role' | 'model' | 'memory' | 'relation' | 'terminal';
 
 interface SidebarProps {
   currentView: ViewType;
@@ -18,24 +32,53 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ currentView, onViewChange }: SidebarProps) {
+  // Avoid SSR/client hydration mismatch from Antd Menu auto-generated ids
+  const [hydrated, setHydrated] = useState(false);
   const [creatingNewArchive, setCreatingNewArchive] = useState(false);
+  const { modal } = App.useApp();
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
   
-  const menuItems: { id: ViewType; label: string; icon: string }[] = [
-    { id: 'chat', label: '当前会话', icon: '💬' },
-    { id: 'archive-save', label: '存档', icon: '💾' },
-    { id: 'archive-load', label: '加载', icon: '📂' },
-    { id: 'system', label: '系统设置', icon: '⚙️' },
-    { id: 'user', label: '用户设置', icon: '👤' },
-    { id: 'role', label: '角色设置', icon: '🎭' },
-    { id: 'model', label: '模型设置', icon: '🤖' },
-    { id: 'memory', label: '记忆', icon: '🧠' },
-    { id: 'relation', label: '关系', icon: '🔗' },
+  const menuItems: { id: ViewType; label: string; icon: React.ReactNode }[] = [
+    { id: 'chat', label: '当前会话', icon: <MessageOutlined /> },
+    { id: 'archive-save', label: '存档', icon: <SaveOutlined /> },
+    { id: 'archive-load', label: '加载', icon: <FolderOpenOutlined /> },
+    { id: 'system', label: '系统设置', icon: <SettingOutlined /> },
+    { id: 'user', label: '用户设置', icon: <UserOutlined /> },
+    { id: 'role', label: '角色设置', icon: <IdcardOutlined /> },
+    { id: 'model', label: '模型设置', icon: <RobotOutlined /> },
+    { id: 'memory', label: '记忆', icon: <DatabaseOutlined /> },
+    { id: 'relation', label: '关系', icon: <ClusterOutlined /> },
+    { id: 'terminal', label: '终端', icon: <ThunderboltOutlined /> },
   ];
 
   const handleCreateNewArchive = async () => {
-    if (!confirm('确定要开启新存档吗？这将创建一个空白存档并切换到该存档。')) {
-      return;
-    }
+    const confirmed = await new Promise<boolean>((resolve) => {
+      let settled = false;
+      modal.confirm({
+        title: '开启新存档？',
+        icon: <ThunderboltOutlined />,
+        content: '这将创建一个空白存档并切换到该存档。',
+        okText: '确定',
+        cancelText: '取消',
+        centered: true,
+        onOk: () => {
+          settled = true;
+          resolve(true);
+        },
+        onCancel: () => {
+          settled = true;
+          resolve(false);
+        },
+        afterClose: () => {
+          if (!settled) resolve(false);
+        },
+      });
+    });
+
+    if (!confirmed) return;
 
     try {
       setCreatingNewArchive(true);
@@ -75,38 +118,56 @@ export default function Sidebar({ currentView, onViewChange }: SidebarProps) {
     }
   };
 
+  if (!hydrated) {
+    return <div style={{ width: 256, height: '100vh' }} />;
+  }
+
   return (
-    <div className="h-full flex flex-col bg-slate-950 border-r border-slate-700">
-      {/* 开启新存档按钮 - 在顶部 */}
-      <div className="p-2 border-b border-slate-700">
-        <button
+    <Layout.Sider
+      width={256}
+      theme="dark"
+      style={{
+        background: 'linear-gradient(180deg, #0b1220 0%, #0a1020 100%)',
+        borderRight: '1px solid #1f2937',
+        height: '100vh',
+      }}
+    >
+      <div className="h-full flex flex-col">
+        <div className="p-3 border-b border-slate-800">
+          <Space direction="vertical" size={12} className="w-full">
+            <Typography.Title level={5} style={{ color: '#e5e7eb', margin: 0 }}>
+              NeoChat
+            </Typography.Title>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              block
+              size="middle"
+              loading={creatingNewArchive}
           onClick={handleCreateNewArchive}
-          disabled={creatingNewArchive}
-          className="w-full px-3 py-2 rounded-md bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors text-white"
-          title="创建一个空白存档并切换到该存档"
+              className="!bg-[#ff0066] !border-[#ff0066] hover:!bg-[#ff3388] hover:!border-[#ff3388] active:!bg-[#cc0055] active:!border-[#cc0055]"
         >
-          {creatingNewArchive ? '创建中...' : '✨ 开启新存档'}
-        </button>
+              开启新存档
+            </Button>
+          </Space>
       </div>
       
-      {/* 菜单项列表 */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-1">
-        {menuItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => onViewChange(item.id)}
-            className={`w-full text-left px-4 py-3 rounded-md text-sm font-medium transition-colors ${
-              currentView === item.id
-                ? 'bg-sky-600 text-white'
-                : 'text-slate-300 hover:bg-slate-800 hover:text-slate-50'
-            }`}
-          >
-            <span className="mr-2">{item.icon}</span>
-            {item.label}
-          </button>
-        ))}
+        <div className="flex-1 overflow-y-auto">
+          <Menu
+            theme="dark"
+            mode="inline"
+            selectedKeys={[currentView]}
+            onClick={({ key }) => onViewChange(key as ViewType)}
+            items={menuItems.map((item) => ({
+              key: item.id,
+              label: item.label,
+              icon: item.icon,
+            }))}
+            style={{ borderRight: 'none', background: 'transparent', padding: '8px' }}
+          />
       </div>
     </div>
+    </Layout.Sider>
   );
 }
 

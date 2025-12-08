@@ -12,11 +12,11 @@ export default function RelationView() {
   const [error, setError] = useState<string | null>(null);
   const isInitializedRef = useRef(false);
 
-  const loadData = async (isInitialLoad = false, showLoading = true) => {
+  const loadData = async (isInitialLoad = false, showLoading = true, silentRefresh = false) => {
     try {
       // 只在需要显示 loading 时才设置 loading 状态
       // 如果已有数据，则不显示 loading，避免闪烁
-      if (showLoading || relationData.length === 0) {
+      if (!silentRefresh && (showLoading || relationData.length === 0)) {
         setLoading(true);
       }
       setError(null);
@@ -71,7 +71,9 @@ export default function RelationView() {
       console.error('Failed to load relation data:', err);
       setError(err.message || '加载关系数据失败');
     } finally {
+      if (!silentRefresh) {
       setLoading(false);
+      }
     }
   };
 
@@ -95,7 +97,7 @@ export default function RelationView() {
     const handleViewSwitched = (event: CustomEvent) => {
       if (event.detail === 'relation' && isInitializedRef.current) {
         // 静默刷新，不显示 loading，避免闪烁
-        loadData(false, false);
+      loadData(false, false, true);
       }
     };
 
@@ -131,9 +133,9 @@ export default function RelationView() {
   return (
     <div className="h-full flex bg-slate-900">
       {/* 左侧角色侧边栏 */}
-      <div className="w-64 flex-shrink-0 border-r border-slate-700 bg-slate-950 flex flex-col">
-        <div className="p-4 border-b border-slate-700 flex-shrink-0">
-          <h2 className="text-lg font-semibold text-slate-200">角色列表</h2>
+      <div className="w-64 flex-shrink-0 border-r border-slate-800 bg-gradient-to-b from-[#0b1220] to-[#0a1020] flex flex-col shadow-[0_10px_28px_rgba(0,0,0,0.28)]">
+        <div className="p-4 border-b border-slate-800 flex-shrink-0">
+          <h2 className="text-lg font-semibold text-slate-100">角色列表</h2>
         </div>
         <div className="flex-1 overflow-y-auto">
           {characters.map((char) => {
@@ -145,12 +147,12 @@ export default function RelationView() {
               <button
                 key={char.character_id}
                 onClick={() => setSelectedCharacterId(char.character_id)}
-                className={`w-full text-left px-4 py-3 border-b border-slate-800 hover:bg-slate-800 transition-colors ${
-                  isSelected ? 'bg-sky-600/20 border-l-4 border-l-sky-500' : ''
+                className={`w-full text-left px-4 py-3 border-b border-slate-800/70 hover:bg-slate-800/60 transition-colors ${
+                  isSelected ? 'bg-sky-600/25 border-l-4 border-l-sky-500 shadow-inner shadow-sky-900/40' : ''
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-slate-700 border border-slate-600 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                  <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center flex-shrink-0 overflow-hidden shadow-sm">
                     {char.avatar ? (
                       <img src={char.avatar} alt={char.name} className="w-full h-full object-cover" />
                     ) : (
@@ -158,7 +160,7 @@ export default function RelationView() {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className={`font-medium truncate ${isSelected ? 'text-sky-300' : 'text-slate-200'}`}>
+                    <div className={`font-medium truncate ${isSelected ? 'text-sky-200' : 'text-slate-100'}`}>
                       {char.name}
                     </div>
                     <div className="text-xs text-slate-400 mt-0.5">

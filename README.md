@@ -49,9 +49,7 @@ NPC自觉管理的日程和人际关系
 
 ### 下载发布版本
 
-1. 前往 [Releases 页面](https://github.com/fly2outerspace/NeoChat/releases) 下载最新版本
-2. 下载 `NeoChat-v0.0.2-windows.zip` 压缩包
-3. 解压到任意目录
+前往 [Releases 页面](https://github.com/fly2outerspace/NeoChat/releases) 下载最新版本
 
 ### 启动程序
 
@@ -59,20 +57,9 @@ NPC自觉管理的日程和人际关系
 
 程序启动后，打开浏览器访问 **http://localhost:8000** 进入聊天界面。
 
-### 目录说明
+前往模型配置界面，配置模型
 
-```
-NeoChat/
-├── NeoChat.exe          # 双击运行
-├── meilisearch/         # 搜索引擎（已内置）
-├── data/                # 工作数据
-├── save/                # 存档目录
-└── _internal/           # 程序文件
-    └── config/
-        └── config.toml  # 配置文件（LLM API 等）
-```
-
----
+设置你的第一个角色提示词，然后就可以开始聊天！
 
 ## 开发环境设置 (For Developers)
 
@@ -134,14 +121,45 @@ auto_start = true
 
 ### 4. 启动开发服务器
 
-在项目根目录下执行：
+#### 方式一：使用 Electron（推荐）
 
+Electron 提供统一的进程管理，自动启动前端和后端：
+
+```bash
+cd electron
+npm install  # 首次需要安装 Electron 依赖
+npm run dev
+```
+
+**优势**：
+- 一键启动前端和后端
+- 统一的进程管理，优雅关闭
+- 自动检测并复用已运行的前端 dev server
+- 实时显示后端日志
+
+#### 方式二：手动启动（传统方式）
+
+**启动后端**：
 ```bash
 python run_api.py
 ```
 
-这将同时启动：
-- 后端 API 服务器（默认端口: 8000）
-- 前端开发服务器（Next.js）
+**启动前端**（新终端）：
+```bash
+cd frontend/web-chat
+pnpm dev  # 或 npm run dev
+```
 
-访问 http://localhost:3000 查看前端界面。
+**注意**：
+- `run_api.py` 现在仅启动后端 API 服务器（端口 8000）
+- 前端需要单独启动（端口 3000）
+- 访问 http://localhost:3000 查看前端界面
+
+#### 推荐开发流程
+
+对于日常开发，推荐使用 Electron 方式：
+- 更简洁：一个命令启动所有服务
+- 更可靠：统一的进程管理，避免进程泄漏
+- 更智能：自动检测已运行的服务并复用
+
+对于调试或特殊需求，可以使用手动启动方式。

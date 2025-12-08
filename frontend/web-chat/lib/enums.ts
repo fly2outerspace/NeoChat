@@ -13,10 +13,6 @@ export enum InputMode {
   COMMAND = 'command',
   /** 跳过 - Skip mode (no content, no bubble) */
   SKIP = 'skip',
-  /** 新输入模式2 - New input mode 2 (placeholder) */
-  NEW_MODE_2 = 'new_mode_2',
-  /** 新输入模式3 - New input mode 3 (placeholder) */
-  NEW_MODE_3 = 'new_mode_3',
 }
 
 /**
@@ -78,22 +74,6 @@ export const INPUT_MODE_OPTIONS: readonly InputModeConfig[] = [
     placeholder: '输入系统指令内容，指挥AI行动，Enter 发送，Shift+Enter 换行',
     helper: '发送系统指令消息',
     available: true,
-    category: InputModeCategory.EXTENDED,
-  },
-  {
-    key: InputMode.NEW_MODE_2,
-    label: '新输入模式2',
-    placeholder: '新输入模式2功能开发中，敬请期待',
-    helper: '新输入模式2功能开发中',
-    available: false,
-    category: InputModeCategory.EXTENDED,
-  },
-  {
-    key: InputMode.NEW_MODE_3,
-    label: '新输入模式3',
-    placeholder: '新输入模式3功能开发中，敬请期待',
-    helper: '新输入模式3功能开发中',
-    available: false,
     category: InputModeCategory.EXTENDED,
   },
 ] as const;

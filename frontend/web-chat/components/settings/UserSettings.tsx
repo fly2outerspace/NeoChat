@@ -217,7 +217,7 @@ export default function UserSettings() {
       )}
 
       {/* User settings area */}
-      <div className="bg-slate-950 border border-slate-700 rounded-lg p-6">
+      <div className="panel p-6">
         {loading ? (
           <div className="text-center py-8 text-slate-400">加载中...</div>
         ) : (

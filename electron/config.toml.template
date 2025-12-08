@@ -1,0 +1,47 @@
+# NeoChat 配置文件模板
+# 此文件会在构建时复制到 backend/config/config.toml
+# 生产环境使用相对路径，自动解析到应用目录
+
+# Global LLM configuration
+[llm.openai]
+model = "gpt-4o"
+base_url = "https://api.openai.com/v1"
+api_key = ""
+max_tokens = 4096
+temperature = 1
+
+# DeepSeek configuration
+[llm.deepseek]
+model = "deepseek-chat"
+base_url = "https://api.deepseek.com/v1"
+api_key = ""
+max_tokens = 4096
+temperature = 1
+
+# Grok configuration (xAI)
+[llm.grok]
+model = "grok-4-1-fast-non-reasoning"
+base_url = "https://api.x.ai/v1"
+api_key = ""
+max_tokens = 4096
+temperature = 1
+
+[llm.openrouter]
+model = "google/gemini-2.5-flash"
+base_url = "https://openrouter.ai/api/v1"
+api_key = ""  
+max_tokens = 4096
+temperature = 1
+
+# Meilisearch configuration (optional)
+# 在打包应用中，使用相对路径，会自动解析到应用目录
+[meilisearch]
+executable_path = "meilisearch/meilisearch.exe"  # 相对路径，相对于后端可执行文件目录
+db_path = "meili_data"  # 相对路径，数据会保存在应用目录下
+http_addr = "127.0.0.1:7700"
+auto_start = true  # 自动启动 Meilisearch
+
+
+
+
+
